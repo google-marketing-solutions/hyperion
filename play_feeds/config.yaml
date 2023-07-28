@@ -1,0 +1,9 @@
+project_id: <project_id>
+
+dataset_id: play_console_reports
+
+mappings:
+  hm games:
+    bucket: pubsite_prod_abcd
+    table_suffix: ABCD
+
