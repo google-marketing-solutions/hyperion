@@ -1,0 +1,8 @@
+project_id: irenexu-solutions
+
+dataset_id: test
+
+mappings:
+  abc xyz:
+    bucket: irene_test
+    table_suffix: HMG
