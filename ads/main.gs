@@ -308,9 +308,9 @@ function processReports() {
 function retrieveAdsReport(reportConfig) {
   var fieldNames = Object.keys(reportConfig.FIELDS);
   if (backfill == true) {
-var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.country_criterion_id, campaign.app_campaign_setting.app_id, customer.currency_code, segments.date FROM geographic_view WHERE segments.date >= '" + backfill_start_date + "' AND segments.date <= '" + backfill_end_date + "' AND metrics.cost_micros > 0 and campaign.app_campaign_setting.app_id is not null";  }
+    var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.country_criterion_id, campaign.app_campaign_setting.app_id, customer.currency_code, segments.date, campaign.app_campaign_setting.app_store FROM geographic_view WHERE segments.date >= '" + backfill_start_date + "' AND segments.date <= '" + backfill_end_date + "' AND metrics.cost_micros > 0 and campaign.app_campaign_setting.app_id is not null and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";  }
   else {
-    var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.country_criterion_id, campaign.app_campaign_setting.app_id, customer.currency_code, segments.date FROM geographic_view WHERE segments.date = '" + yesterdayFormatted + "' AND metrics.cost_micros > 0 and campaign.app_campaign_setting.app_id is not null";
+    var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.country_criterion_id, campaign.app_campaign_setting.app_id, customer.currency_code, segments.date, campaign.app_campaign_setting.app_store FROM geographic_view WHERE segments.date = '" + yesterdayFormatted + "' AND metrics.cost_micros > 0 and campaign.app_campaign_setting.app_id is not null and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
   }
   Logger.log(query);
   
@@ -336,9 +336,12 @@ var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.co
       csvRows = [];
     }
     var csvRow = [];
-    var fieldNames2 = ['metrics.conversions', 'metrics.cost_micros', 'geographic_view.country_criterion_id', 'campaign.app_campaign_setting.app_id', 'customer.currency_code', 'segments.date']
+    var fieldNames2 = ['metrics.conversions', 'metrics.cost_micros', 'geographic_view.country_criterion_id', 'campaign.app_campaign_setting.app_id', 'customer.currency_code', 'segments.date', 'campaign.app_campaign_setting.app_store']
     for (var i = 0; i < fieldNames2.length; i++) {
       var fieldName = fieldNames2[i];
+      if (fieldName == 'campaign.app_campaign_setting.app_store') {
+        continue
+      }
       // for debugging purposes
       if (row[fieldName] == undefined) {
         Logger.log(fieldName)
