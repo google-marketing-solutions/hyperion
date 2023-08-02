@@ -493,70 +493,81 @@ def admob_report_main(cloud_event):
     token_files = admob_utils.list_files_with_prefix('token')
     global TOTAL_TOKENS
     TOTAL_TOKENS = len(token_files)
+
+    errors_occurred = False
     
     for token_num, token_f in enumerate(token_files):
-        global PUBLISHER_ID
-        PUBLISHER_ID = admob_utils.extract_publisher_id(token_f)
+        try:
+            global PUBLISHER_ID
+            PUBLISHER_ID = admob_utils.extract_publisher_id(token_f)
 
-        global TOKEN_NUMBER
-        TOKEN_NUMBER = token_num + 1
+            global TOKEN_NUMBER
+            TOKEN_NUMBER = token_num + 1
 
-        service = admob_utils.authenticate(token_f)
-        pub_id = None
-        backfill = False
-        dry_run = False
-        populate_apps_list = False
-        start_date_year = '2022'
-        start_date_month = '1'
-        start_date_day = '1'
-        end_date_year = None
-        end_date_month = None
-        end_date_day = None
+            service = admob_utils.authenticate(token_f)
+            pub_id = None
+            backfill = False
+            dry_run = False
+            populate_apps_list = False
+            start_date_year = '2022'
+            start_date_month = '1'
+            start_date_day = '1'
+            end_date_year = None
+            end_date_month = None
+            end_date_day = None
 
-        # Get the attributes from the Cloud Event.
-        if "attributes" in cloud_event.data["message"] and cloud_event.data["message"]["attributes"] is not None:
-            attr_dic = cloud_event.data["message"]["attributes"]
+            # Get the attributes from the Cloud Event.
+            if "attributes" in cloud_event.data["message"] and cloud_event.data["message"]["attributes"] is not None:
+                attr_dic = cloud_event.data["message"]["attributes"]
 
-            if "backfill" in attr_dic:
-                backfill = attr_dic["backfill"]
-            if "dry_run" in attr_dic:
-                dry_run = attr_dic["dry_run"]
-            if "populate_apps_list" in attr_dic:
-                populate_apps_list = attr_dic["populate_apps_list"]
-            if "pub_id" in attr_dic:
-                pub_id = attr_dic["pub_id"]
-            if "start_date" in attr_dic:
-                start_date_year, start_date_month, start_date_day = attr_dic["start_date"].split('-')
-            if "end_date" in attr_dic:
-                end_date_year, end_date_month, end_date_day = attr_dic["end_date"].split('-')
+                if "backfill" in attr_dic:
+                    backfill = attr_dic["backfill"]
+                if "dry_run" in attr_dic:
+                    dry_run = attr_dic["dry_run"]
+                if "populate_apps_list" in attr_dic:
+                    populate_apps_list = attr_dic["populate_apps_list"]
+                if "pub_id" in attr_dic:
+                    pub_id = attr_dic["pub_id"]
+                if "start_date" in attr_dic:
+                    start_date_year, start_date_month, start_date_day = attr_dic["start_date"].split('-')
+                if "end_date" in attr_dic:
+                    end_date_year, end_date_month, end_date_day = attr_dic["end_date"].split('-')
 
-        # Check if the publisher ID in the Cloud Event matches the current publisher ID.
-        if pub_id:
-            TOTAL_TOKENS = 1
-            TOKEN_NUMBER = 1
-            if pub_id != PUBLISHER_ID:
+            # Check if the publisher ID in the Cloud Event matches the current publisher ID.
+            if pub_id:
+                TOTAL_TOKENS = 1
+                TOKEN_NUMBER = 1
+                if pub_id != PUBLISHER_ID:
+                    return
+
+            # Check if backfill is enabled.
+            if backfill == 'True' or backfill == 'true' or backfill == 'TRUE':
+                backfill = True
+
+            # Check if list_apps should be called.
+            if populate_apps_list == 'True' or populate_apps_list == 'true' or populate_apps_list == 'TRUE':
+                list_apps(service, dry_run)
+
+            # Check if the start date is after the end date.
+            if end_date_year:
+                start_date = date(int(start_date_year), int(start_date_month), int(start_date_day))
+                end_date = date(int(end_date_year), int(end_date_month), int(end_date_day))
+                if start_date > end_date:
+                    raise ValueError("Start date must be before end date.")
+            
+            # Generate the network report.
+            stop_function = generate_network_report(service, backfill, dry_run, start_date_year, start_date_month, start_date_day, end_date_year, end_date_month, end_date_day)
+
+            if stop_function:
                 return
-
-        # Check if backfill is enabled.
-        if backfill == 'True' or backfill == 'true' or backfill == 'TRUE':
-            backfill = True
-
-        # Check if list_apps should be called.
-        if populate_apps_list == 'True' or populate_apps_list == 'true' or populate_apps_list == 'TRUE':
-            list_apps(service, dry_run)
-
-        # Check if the start date is after the end date.
-        if end_date_year:
-            start_date = date(int(start_date_year), int(start_date_month), int(start_date_day))
-            end_date = date(int(end_date_year), int(end_date_month), int(end_date_day))
-            if start_date > end_date:
-                raise ValueError("Start date must be before end date.")
-        
-        # Generate the network report.
-        stop_function = generate_network_report(service, backfill, dry_run, start_date_year, start_date_month, start_date_day, end_date_year, end_date_month, end_date_day)
-
-        if stop_function:
-            return
+        except Exception as e:
+            print(f"Error occurred in loop iteration: {e}")
+            # Mark that an error occurred during the loop
+            errors_occurred = True
+            continue
+    # Check if any errors occurred during the loop and raise an error if needed
+    if errors_occurred:
+      raise Exception("One or more errors occurred during the loop.")
 
 """
 This script generates a network report for Admob.
@@ -589,57 +600,68 @@ if __name__ == "__main__":
     token_files = admob_utils.list_files_with_prefix('token')
     TOTAL_TOKENS = len(token_files)
 
+    errors_occurred = False
+
     for token_num, token_f in enumerate(token_files):
-        PUBLISHER_ID = admob_utils.extract_publisher_id(token_f)
-        TOKEN_NUMBER = token_num + 1
+        try:
+            PUBLISHER_ID = admob_utils.extract_publisher_id(token_f)
+            TOKEN_NUMBER = token_num + 1
 
-        # if there is a pub id declared as an env variable and that pub id doesn't match the loop's current pub id, then skip that loop instance
-        if 'PUB_ID' in os.environ:
-            TOTAL_TOKENS = 1
-            TOKEN_NUMBER = 1
-            if os.environ.get('PUB_ID') != PUBLISHER_ID:
-                continue
+            # if there is a pub id declared as an env variable and that pub id doesn't match the loop's current pub id, then skip that loop instance
+            if 'PUB_ID' in os.environ:
+                TOTAL_TOKENS = 1
+                TOKEN_NUMBER = 1
+                if os.environ.get('PUB_ID') != PUBLISHER_ID:
+                    continue
 
-        service = admob_utils.authenticate(token_f)
-        backfill = False
-        dry_run = True
-        start_date_year = '2022'
-        start_date_month = '1'
-        start_date_day = '1'
-        end_date_year = None
-        end_date_month = None
-        end_date_day = None
+            service = admob_utils.authenticate(token_f)
+            backfill = False
+            dry_run = True
+            start_date_year = '2022'
+            start_date_month = '1'
+            start_date_day = '1'
+            end_date_year = None
+            end_date_month = None
+            end_date_day = None
 
-        # Check if we only need to generate the AdMob refresh token 
-        if len(sys.argv) > 1 and '--generate-token-only=true' in sys.argv:
-            exit()
+            # Check if we only need to generate the AdMob refresh token 
+            if len(sys.argv) > 1 and '--generate-token-only=true' in sys.argv:
+                exit()
 
-        # Check if it's not a dry run
-        if len(sys.argv) > 1 and '--dry-run=false' in sys.argv:
-            dry_run = False
-        
-        # Check if list_apps should be called.
-        if len(sys.argv) > 1 and '--apps-list=true' in sys.argv:
-            list_apps(service, dry_run)
+            # Check if it's not a dry run
+            if len(sys.argv) > 1 and '--dry-run=false' in sys.argv:
+                dry_run = False
+            
+            # Check if list_apps should be called.
+            if len(sys.argv) > 1 and '--apps-list=true' in sys.argv:
+                list_apps(service, dry_run)
 
-        # Check if backfill is enabled.
-        if len(sys.argv) > 1 and ('--backfill=true' in sys.argv or '--backfill=custom' in sys.argv):
-            backfill = True
-        
-        if 'START_DATE' in os.environ:
-            start_date_year, start_date_month, start_date_day = os.environ.get('START_DATE').split('-')
-        if len(sys.argv) > 1 and '--backfill=custom' in sys.argv and 'END_DATE' in os.environ:
-            end_date_year, end_date_month, end_date_day = os.environ.get('END_DATE').split('-')
-        
-        # Check if the start date is after the end date.
-        if end_date_year:
-            start_date = date(int(start_date_year), int(start_date_month), int(start_date_day))
-            end_date = date(int(end_date_year), int(end_date_month), int(end_date_day))
-            if start_date > end_date:
-                raise ValueError("Start date must be before end date.")
-        
-        # Generate the network report.
-        stop_function = generate_network_report(service, backfill, dry_run, start_date_year, start_date_month, start_date_day, end_date_year, end_date_month, end_date_day)
+            # Check if backfill is enabled.
+            if len(sys.argv) > 1 and ('--backfill=true' in sys.argv or '--backfill=custom' in sys.argv):
+                backfill = True
+            
+            if 'START_DATE' in os.environ:
+                start_date_year, start_date_month, start_date_day = os.environ.get('START_DATE').split('-')
+            if len(sys.argv) > 1 and '--backfill=custom' in sys.argv and 'END_DATE' in os.environ:
+                end_date_year, end_date_month, end_date_day = os.environ.get('END_DATE').split('-')
+            
+            # Check if the start date is after the end date.
+            if end_date_year:
+                start_date = date(int(start_date_year), int(start_date_month), int(start_date_day))
+                end_date = date(int(end_date_year), int(end_date_month), int(end_date_day))
+                if start_date > end_date:
+                    raise ValueError("Start date must be before end date.")
+            
+            # Generate the network report.
+            stop_function = generate_network_report(service, backfill, dry_run, start_date_year, start_date_month, start_date_day, end_date_year, end_date_month, end_date_day)
 
-        if stop_function:
-            break
+            if stop_function:
+                break
+        except Exception as e:
+            print(f"Error occurred in loop iteration: {e}")
+            # Mark that an error occurred during the loop
+            errors_occurred = True
+            continue
+    # Check if any errors occurred during the loop and raise an error if needed
+    if errors_occurred:
+      raise Exception("One or more errors occurred during the loop.")
