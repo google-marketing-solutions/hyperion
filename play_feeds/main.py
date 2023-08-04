@@ -53,7 +53,6 @@ with open(CONFIG_YAML_FILE, 'r') as mapping_file:
   config = yaml.safe_load(mapping_file)
   project_id = config.get('project_id')
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'application_default_credentials.json'
 os.environ['GCLOUD_PROJECT'] = project_id
 
 logging_client = logging.Client()

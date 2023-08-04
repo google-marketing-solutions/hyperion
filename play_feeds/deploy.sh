@@ -60,7 +60,7 @@ function deploy_cloud_function() {
     --memory 2048MB \
     --timeout=540s \
     --trigger-topic=${TOPIC} \
-    --set-build-env-vars=GOOGLE_APPLICATION_CREDENTIALS=application_default_credentials.json,GCLOUD_PROJECT=${PROJECT}
+    --set-build-env-vars=GCLOUD_PROJECT=${PROJECT}
 
   echo "Deploying Play Feeds Cloud Function for Backfill"
   gcloud functions deploy play_feeds_backfill \
@@ -70,7 +70,7 @@ function deploy_cloud_function() {
     --memory 8GB \
     --timeout=540s \
     --trigger-topic=${TOPIC}_backfill \
-    --set-build-env-vars=GOOGLE_APPLICATION_CREDENTIALS=application_default_credentials.json,GCLOUD_PROJECT=${PROJECT}
+    --set-build-env-vars=GCLOUD_PROJECT=${PROJECT}
 
 }
 
@@ -123,7 +123,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "[CONFIG]"
-echo "  PROPJECT: ${PROJECT}"
+echo "  PROJECT: ${PROJECT}"
 echo "  TOPIC: ${TOPIC}"
 echo "  DRY_RUN: ${TEST}"
 
