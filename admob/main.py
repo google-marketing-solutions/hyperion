@@ -103,7 +103,7 @@ def list_apps(service, dry_run=False):
         else:
             custom_logging(f"Dataset {dataset_id} already exists.")
 
-        table_id = f"{os.environ.get('GCP_PROJECT')}.{dataset_id}.list_apps"
+        table_id = f"{os.environ.get('GCP_PROJECT')}.{dataset_id}.list_apps_{PUBLISHER_ID}"
 
         # Check if table exists
         table_exists = False
@@ -177,7 +177,7 @@ def generate_network_report(service, backfill=False, dry_run=False, start_date_y
 
     if not dry_run:
         dataset_id = "admob_reporting_data"
-        table_id = f"{os.environ.get('GCP_PROJECT')}.{dataset_id}.admob_network_report"
+        table_id = f"{os.environ.get('GCP_PROJECT')}.{dataset_id}.admob_network_report_{PUBLISHER_ID}"
         
         # Construct a BigQuery client object.
         client = bigquery.Client(project=os.environ.get('GCP_PROJECT'))
