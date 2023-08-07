@@ -1,0 +1,7 @@
+functions-framework
+google-api-python-client
+google-auth-oauthlib
+google-cloud-bigquery
+google-cloud-bigquery-storage
+flatten-json
+pytz
