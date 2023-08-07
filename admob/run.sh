@@ -21,7 +21,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # install dependencies
-pip3 install -r requirements.txt
+pip install --require-hashes -r requirements.txt
 
 # run main script
 python3 main.py --generate-token-only=true
