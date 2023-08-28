@@ -47,7 +47,7 @@ def load_user_credentials():
 
 
 # Authenticate user and create AdMob Service Object.
-def authenticate(token_f):
+def authenticate(token_f=''):
   """Authenticates a user and creates an AdMob Service Object.
 
   Args:
