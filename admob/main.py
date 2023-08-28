@@ -597,6 +597,11 @@ Command line flags:
     --backfill: Do a backfill for the AdMob data.
 """
 if __name__ == "__main__":
+    # Check if we only need to generate the AdMob refresh token 
+    if len(sys.argv) > 1 and '--generate-token-only=true' in sys.argv:
+        admob_utils.authenticate()
+        exit()
+
     token_files = admob_utils.list_files_with_prefix('token')
     TOTAL_TOKENS = len(token_files)
 
@@ -623,10 +628,6 @@ if __name__ == "__main__":
             end_date_year = None
             end_date_month = None
             end_date_day = None
-
-            # Check if we only need to generate the AdMob refresh token 
-            if len(sys.argv) > 1 and '--generate-token-only=true' in sys.argv:
-                exit()
 
             # Check if it's not a dry run
             if len(sys.argv) > 1 and '--dry-run=false' in sys.argv:
