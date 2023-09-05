@@ -42,7 +42,7 @@ def list_apps(service, dry_run=False):
     Args:
         service: An AdMob Service Object.
     """
-    custom_logging('Generating apps list for ', PUBLISHER_ID)
+    custom_logging(f'Generating apps list for {PUBLISHER_ID}')
 
     data = []
     next_page_token = ''
@@ -182,6 +182,53 @@ def generate_network_report(service, backfill=False, dry_run=False, start_date_y
         # Construct a BigQuery client object.
         client = bigquery.Client(project=os.environ.get('GCP_PROJECT'))
 
+        # Check if the dataset already exists
+        dataset_exists = False
+        try:
+            client.get_dataset(dataset_id)
+            dataset_exists = True
+        except NotFound:
+            pass
+
+        if not dataset_exists:
+            # The dataset does not exist, so create it
+            dataset = client.create_dataset(dataset_id)
+            custom_logging(f"Dataset {dataset.dataset_id} created.")
+        else:
+            custom_logging(f"Dataset {dataset_id} already exists.")
+
+        # Check if table exists
+        table_exists = False
+        try:
+            client.get_table(table_id)
+            table_exists = True
+        except NotFound:
+            pass
+
+        # Create table if it doesn't exist
+        if not table_exists:
+            # Create a schema
+            schema = [
+                bigquery.SchemaField("dimensionValues_DATE_value", 'DATE', mode="NULLABLE"),
+                bigquery.SchemaField("dimensionValues_COUNTRY_value", 'STRING', mode="NULLABLE"),
+                bigquery.SchemaField("dimensionValues_APP_value", 'STRING', mode="NULLABLE"),
+                bigquery.SchemaField("dimensionValues_APP_displayLabel", 'STRING', mode="NULLABLE"),
+                bigquery.SchemaField("metricValues_ESTIMATED_EARNINGS_microsValue", 'INTEGER', mode="NULLABLE"),
+                bigquery.SchemaField("metricValues_IMPRESSIONS_integerValue", 'INTEGER', mode="NULLABLE"),
+            ]
+            table = bigquery.Table(table_id, schema=schema)
+            table = client.create_table(table)
+            table.time_partitioning = bigquery.TimePartitioning(
+                type_=bigquery.TimePartitioningType.DAY,
+                field="dimensionValues_DATE_value",  # name of column to use for partitioning
+            )
+            # Enable "require where clause to query data"
+            table.require_partition_filter = True
+            table.clustering_fields = ["dimensionValues_APP_value", "dimensionValues_COUNTRY_value"]
+            custom_logging(f"Table {table.table_id} created.")
+        else:
+            custom_logging(f"Table {table_id} already exists.")
+
     if not backfill:
         end_date = datetime_now.date() - timedelta(days=1)
         date_range = {
@@ -273,6 +320,8 @@ def generate_network_report(service, backfill=False, dry_run=False, start_date_y
                 custom_logging(f"There are already rows in the table within the specified start and end date range: {start_date} - {end_date}")
                 return 1
 
+        custom_logging(date_range)
+        
         left, right = 1, (end_date - start_date).days + 1
         while left <= right:
             mid = (left + right) // 2
@@ -394,53 +443,6 @@ def generate_network_report(service, backfill=False, dry_run=False, start_date_y
         except Exception:
             custom_logging("dry run complete (cloud function) \n")
     else:
-        # Check if the dataset already exists
-        dataset_exists = False
-        try:
-            client.get_dataset(dataset_id)
-            dataset_exists = True
-        except NotFound:
-            pass
-
-        if not dataset_exists:
-            # The dataset does not exist, so create it
-            dataset = client.create_dataset(dataset_id)
-            custom_logging(f"Dataset {dataset.dataset_id} created.")
-        else:
-            custom_logging(f"Dataset {dataset_id} already exists.")
-
-        # Check if table exists
-        table_exists = False
-        try:
-            client.get_table(table_id)
-            table_exists = True
-        except NotFound:
-            pass
-
-        # Create table if it doesn't exist
-        if not table_exists:
-            # Create a schema
-            schema = [
-                bigquery.SchemaField("dimensionValues_DATE_value", 'DATE', mode="NULLABLE"),
-                bigquery.SchemaField("dimensionValues_COUNTRY_value", 'STRING', mode="NULLABLE"),
-                bigquery.SchemaField("dimensionValues_APP_value", 'STRING', mode="NULLABLE"),
-                bigquery.SchemaField("dimensionValues_APP_displayLabel", 'STRING', mode="NULLABLE"),
-                bigquery.SchemaField("metricValues_ESTIMATED_EARNINGS_microsValue", 'INTEGER', mode="NULLABLE"),
-                bigquery.SchemaField("metricValues_IMPRESSIONS_integerValue", 'INTEGER', mode="NULLABLE"),
-            ]
-            table = bigquery.Table(table_id, schema=schema)
-            table = client.create_table(table)
-            table.time_partitioning = bigquery.TimePartitioning(
-                type_=bigquery.TimePartitioningType.DAY,
-                field="dimensionValues_DATE_value",  # name of column to use for partitioning
-            )
-            # Enable "require where clause to query data"
-            table.require_partition_filter = True
-            table.clustering_fields = ["dimensionValues_APP_value", "dimensionValues_COUNTRY_value"]
-            custom_logging(f"Table {table.table_id} created.")
-        else:
-            custom_logging(f"Table {table_id} already exists.")
-
         job_config = bigquery.LoadJobConfig(
             source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON, autodetect=True, write_disposition=bigquery.WriteDisposition.WRITE_APPEND)
 
@@ -479,12 +481,8 @@ Raises:
 * `dry_run`: Whether to run the function in dry-run mode.
 * `populate_apps_list`: Whether to call the `list_apps()` function.
 * `pub_id`: The publisher ID for the Admob account.
-* `start_date_year`: The year of the start date.
-* `start_date_month`: The month of the start date.
-* `start_date_day`: The day of the start date.
-* `end_date_year`: The year of the end date (optional).
-* `end_date_month`: The month of the end date (optional).
-* `end_date_day`: The day of the end date (optional).
+* `start_date`: The start date.
+* `end_date`: The end date (optional).
 
 """
 # Triggered from a message on a Cloud Pub/Sub topic.
@@ -577,24 +575,22 @@ Important variables:
     token_files: A list of files containing Admob tokens.
     PUBLISHER_ID: The publisher ID for the Admob account.
     service: The Admob service object.
-    backfill: Whether to generate a backfill report.
-    dry_run: Whether to run the script in dry-run mode.
-    start_date_year: The year of the start date (optional).
-    start_date_month: The month of the start date (optional).
-    start_date_day: The day of the start date (optional).
-    end_date_year: The year of the end date (optional - required if backfill=custom).
-    end_date_month: The month of the end date (optional - required if backfill=custom).
-    end_date_day: The day of the end date (optional - required if backfill=custom).
 
 Raises:
     ValueError: If the start date is after the end date.
 
 Command line flags:
 
-    --generate-token-only: Only generate the Admob token file.
-    --apps-list: List and store list of all apps for the Admob account.
-    --dry-run: Run the script in dry-run mode.
-    --backfill: Do a backfill for the AdMob data.
+    --generate-token-only=true: Only generate the Admob token file.
+    --apps-list=true: List and store list of all apps for the Admob account.
+    --dry-run=[true,false]: Run/not run the script in dry-run mode.
+    --backfill=[true,custom]: Do a backfill for the AdMob data (use `custom` to use a custom END_DATE value from the environment variable).
+
+Environment variables:
+
+    GCP_PROJECT: GCP project id (REQUIRED)
+    START_DATE: start date for the backfill (optional - will default to 2022-01-01. May need to set when using backfill=custom to control backfill start and end dates)
+    END_DATE: end date for the backfill (required when backfill is set to `custom`)
 """
 if __name__ == "__main__":
     # Check if we only need to generate the AdMob refresh token 
