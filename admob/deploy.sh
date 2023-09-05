@@ -35,6 +35,7 @@ function enable_apis() {
   gcloud services enable 'cloudfunctions.googleapis.com'
   gcloud services enable 'appengine.googleapis.com'
   gcloud services enable 'cloudscheduler.googleapis.com'
+  gcloud services enable 'cloudbuild.googleapis.com'
 }
 
 function deploy_cloud_function() {
@@ -54,7 +55,8 @@ function deploy_cloud_function() {
   echo "Deploying Get AdMob Reports Cloud Function"
   gcloud functions deploy get_admob_reports \
     --region us-central1 \
-    --runtime python37 \
+    --runtime python311 \
+    --set-env-vars GCP_PROJECT=${PROJECT} \
     --entry-point admob_report_main \
     --memory 8GB \
     --timeout=540s \
