@@ -42,18 +42,10 @@ var CONFIG = {
   TRUNCATE_EXISTING_TABLES: false,
 
   // Lists of reports and fields to retrieve from Google Ads.
-  REPORTS: [
-    {NAME: 'google_ads_report',
-     CONDITIONS: 'WHERE IsTargetingLocation IN [true,false]',
-     FIELDS: {'Paid_Installs' : 'INT64',
-              'Cost' : 'INT64',
-              'Country' : 'STRING',
-              'App_ID': 'STRING',
-              'Currency': 'STRING',
-              'Date' : 'DATE'
-             }
-    }],
+  REPORTS: [],
 };
+
+var ACCOUNTS_LIST = []
 
 // Impose a limit on the size of BQ inserts: 10MB - 512Kb for overheads.
 var MAX_INSERT_SIZE = 10 * 1024 * 1024 - 512 * 1024;
@@ -63,21 +55,35 @@ var MAX_INSERT_SIZE = 10 * 1024 * 1024 - 512 * 1024;
  */
 function main() {
   createDataset();
-  for (var i = 0; i < CONFIG.REPORTS.length; i++) {
-    var reportConfig = CONFIG.REPORTS[i];
-    createTable(reportConfig);
-		if (checkIfRowsExist(reportConfig)) {
-			return
-		}
-  }
-
   var childAccounts = AdsManagerApp.accounts().get()
   while(childAccounts.hasNext()) {
     var childAccount = childAccounts.next()
-    AdsManagerApp.select(childAccount);
-    var jobIds = processReports();
-    waitTillJobsComplete(jobIds);
+    var customerID = childAccount.getCustomerId()
+    CONFIG.REPORTS.push({
+      NAME: 'google_ads_report_' + customerID,
+      CONDITIONS: 'WHERE IsTargetingLocation IN [true,false]',
+      FIELDS: {'Paid_Installs' : 'INT64',
+              'Cost' : 'INT64',
+              'Country' : 'STRING',
+              'App_ID': 'STRING',
+              'Currency': 'STRING',
+              'Date' : 'DATE',
+              },
+    })
+    ACCOUNTS_LIST.push(childAccount)
   }
+
+  for (var i = 0; i < CONFIG.REPORTS.length; i++) {
+    var reportConfig = CONFIG.REPORTS[i];
+    createTable(reportConfig);
+  }
+
+  if (backfill == true) {
+    Logger.log("Backfilling for period: " + backfill_start_date + " to " + backfill_end_date)
+  }
+
+  var jobIds = processReports();
+  waitTillJobsComplete(jobIds);
 }
 
 /**
@@ -255,7 +261,7 @@ function checkIfRowsExist(reportConfig) {
 		let rows = queryResults.rows;
 		
 		if (rows) {
-			Logger.log("There are already rows in the table with the specified date value: " + dateToCheck);
+			Logger.log(reportConfig.NAME + ": There are already rows in this table with the specified date value: " + dateToCheck);
 			return 1;
 		}
 		
@@ -282,7 +288,12 @@ function processReports() {
   // Iterate over each report type.
   for (var i = 0; i < CONFIG.REPORTS.length; i++) {
     var reportConfig = CONFIG.REPORTS[i];
+    if (checkIfRowsExist(reportConfig)) {
+			continue
+		}
     Logger.log('Running report %s', reportConfig.NAME);
+    // Change child account to the one for which we are running the report 
+    AdsManagerApp.select(ACCOUNTS_LIST[i]);
     // Get data as an array of CSV chunks.
     var csvData = retrieveAdsReport(reportConfig);
     for (var j = 0; j < csvData.length; j++) {
@@ -308,9 +319,38 @@ function processReports() {
 function retrieveAdsReport(reportConfig) {
   var fieldNames = Object.keys(reportConfig.FIELDS);
   if (backfill == true) {
-    var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.country_criterion_id, campaign.app_campaign_setting.app_id, customer.currency_code, segments.date, campaign.app_campaign_setting.app_store FROM geographic_view WHERE segments.date >= '" + backfill_start_date + "' AND segments.date <= '" + backfill_end_date + "' AND metrics.cost_micros > 0 and campaign.app_campaign_setting.app_id is not null and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";  }
+    var query = "SELECT " +
+    "metrics.conversions, " +
+    "metrics.cost_micros, " +
+    "geographic_view.country_criterion_id, " +
+    "campaign.app_campaign_setting.app_id, " +
+    "customer.currency_code, " +
+    "segments.date, " +
+    "campaign.app_campaign_setting.app_store " +
+    "FROM " +
+    "geographic_view " +
+    "WHERE " +
+    "segments.date >= '" + backfill_start_date + "' AND segments.date <= '" + backfill_end_date + "' " +
+    "AND metrics.cost_micros > 0 " +
+    "and campaign.app_campaign_setting.app_id is not null " +
+    "and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
+  }
   else {
-    var query = "SELECT metrics.conversions, metrics.cost_micros, geographic_view.country_criterion_id, campaign.app_campaign_setting.app_id, customer.currency_code, segments.date, campaign.app_campaign_setting.app_store FROM geographic_view WHERE segments.date = '" + yesterdayFormatted + "' AND metrics.cost_micros > 0 and campaign.app_campaign_setting.app_id is not null and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
+    var query = "SELECT " +
+    "metrics.conversions, " +
+    "metrics.cost_micros, " +
+    "geographic_view.country_criterion_id, " +
+    "campaign.app_campaign_setting.app_id, " +
+    "customer.currency_code, " +
+    "segments.date, " +
+    "campaign.app_campaign_setting.app_store " +
+    "FROM " +
+    "geographic_view " +
+    "WHERE " +
+    "segments.date = '" + yesterdayFormatted + "' " +
+    "AND metrics.cost_micros > 0 " +
+    "and campaign.app_campaign_setting.app_id is not null " +
+    "and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
   }
   Logger.log(query);
   
@@ -336,18 +376,27 @@ function retrieveAdsReport(reportConfig) {
       csvRows = [];
     }
     var csvRow = [];
-    var fieldNames2 = ['metrics.conversions', 'metrics.cost_micros', 'geographic_view.country_criterion_id', 'campaign.app_campaign_setting.app_id', 'customer.currency_code', 'segments.date', 'campaign.app_campaign_setting.app_store']
+    var fieldNames2 = [
+      'metrics.conversions', 
+      'metrics.cost_micros', 
+      'geographic_view.country_criterion_id', 
+      'campaign.app_campaign_setting.app_id', 
+      'customer.currency_code', 
+      'segments.date', 
+      'campaign.app_campaign_setting.app_store'
+    ]
     for (var i = 0; i < fieldNames2.length; i++) {
-      var fieldName = fieldNames2[i];
-      if (fieldName == 'campaign.app_campaign_setting.app_store') {
+      var fieldName = fieldNames[i];
+      var fieldName2 = fieldNames2[i];
+      if (fieldName2 == 'campaign.app_campaign_setting.app_store') {
         continue
       }
       // for debugging purposes
-      if (row[fieldName] == undefined) {
-        Logger.log(fieldName)
+      if (row[fieldName2] == undefined) {
+        Logger.log(fieldName2)
         Logger.log(row)
       }
-      var fieldValue = row[fieldName].toString();
+      var fieldValue = row[fieldName2].toString();
       var fieldType = reportConfig.FIELDS[fieldName];
       // Strip off % and perform any other formatting here.
       if (fieldType == 'FLOAT' || fieldType == 'INTEGER') {
