@@ -60,7 +60,7 @@ function deploy_cloud_function() {
     --memory 2048MB \
     --timeout=540s \
     --trigger-topic=${TOPIC} \
-    --set-build-env-vars=GCLOUD_PROJECT=${PROJECT}
+    --service-account play-console-buckets@${PROJECT}.iam.gserviceaccount.com
 
   echo "Deploying Play Feeds Cloud Function for Backfill"
   gcloud functions deploy play_feeds_backfill \
@@ -70,7 +70,7 @@ function deploy_cloud_function() {
     --memory 8GB \
     --timeout=540s \
     --trigger-topic=${TOPIC}_backfill \
-    --set-build-env-vars=GCLOUD_PROJECT=${PROJECT}
+    --service-account play-console-buckets@${PROJECT}.iam.gserviceaccount.com
 
 }
 
