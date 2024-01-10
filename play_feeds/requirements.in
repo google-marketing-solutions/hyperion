@@ -1,0 +1,7 @@
+pandas
+google-cloud-storage
+google-cloud-bigquery
+google-cloud-logging
+google-cloud-functions
+pyarrow
+pyyaml
