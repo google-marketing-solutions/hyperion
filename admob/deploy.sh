@@ -19,7 +19,7 @@ deploy.sh
 =========
 
 Usage:
-  . deploy.sh --project cloud-project-id
+  sh deploy.sh --project cloud-project-id
 
 Options:
   --project           Cloud Project ID
@@ -62,8 +62,16 @@ function deploy_cloud_function() {
     --timeout=540s \
     --trigger-topic get_admob_reports \
 
-}
+  # Assign BigQuery Data Owner role
+  gcloud projects add-iam-policy-binding ${PROJECT} \
+    --member="serviceAccount:${PROJECT}@appspot.gserviceaccount.com" \
+    --role="roles/bigquery.dataOwner"
 
+  # Assign BigQuery User role
+  gcloud projects add-iam-policy-binding ${PROJECT} \
+    --member="serviceAccount:${PROJECT}@appspot.gserviceaccount.com" \
+    --role="roles/bigquery.user"
+}
 
 function deploy_all() {
   echo "Setting project..."
