@@ -18,8 +18,7 @@ node_modules
 .venv
 
 .DS_Store
-admob_reports\w+.json
-apps_list\w+.json
+*.json
 __pycache__
 
 README.md

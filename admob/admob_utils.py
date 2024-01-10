@@ -34,7 +34,7 @@ CLIENT_SECRETS_FILE = "client_secrets.json"
 # This OAuth 2.0 access scope allows for full read/write access to the
 # authenticated user's account and requires requests to use an SSL connection.
 API_NAME = "admob"
-API_VERSION = "v1"
+API_VERSION = "v1beta"
 API_SCOPE = "https://www.googleapis.com/auth/admob.readonly"
 
 
