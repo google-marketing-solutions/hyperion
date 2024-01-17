@@ -218,7 +218,7 @@ def handle_dry_run(data, publisher_id, reporting_table=False):
         file_name = ''
 
         if reporting_table:
-            file_name = f'admob_reports {publisher_id}.json'
+            file_name = f'mediation_reports {publisher_id}.json'
         else:
             file_name = f'apps_list {publisher_id}.json'
 
@@ -258,7 +258,7 @@ def setup_bigquery(publisher_id, reporting_table=False):
     dataset_id = "admob_reporting_data"
 
     if reporting_table:
-        table_id = f"{gcp_project}.{dataset_id}.admob_network_report_{publisher_id}"
+        table_id = f"{gcp_project}.{dataset_id}.admob_mediation_report_{publisher_id}"
     else:
         table_id = f"{gcp_project}.{dataset_id}.list_apps_{publisher_id}"
 
@@ -401,9 +401,9 @@ def log_bigquery_table_info(client, table_id):
     table = client.get_table(table_id)  # Make an API request.
     custom_logging(f"{table.num_rows} rows and {len(table.schema)} columns in {table_id}")
 
-def generate_network_report(service, publisher_id, backfill=False, dry_run=True, start_date=None, end_date=None):
+def generate_mediation_report(service, publisher_id, backfill=False, dry_run=True, start_date=None, end_date=None):
     """
-    Generates and prints a network report.
+    Generates and prints a mediation report.
 
     Args:
         service: An AdMob Service Object.
@@ -416,13 +416,13 @@ def generate_network_report(service, publisher_id, backfill=False, dry_run=True,
         None
 
     """
-    custom_logging(f'Generating network report for {publisher_id}')
+    custom_logging(f'Generating mediation report for {publisher_id}')
 
     date_range = setup_date_range_for_report(backfill, start_date, end_date)
 
     custom_logging(date_range)
 
-    report_spec = setup_network_report_spec(date_range)
+    report_spec = setup_mediation_report_spec(date_range)
 
     if not dry_run:
         client, table_id = setup_bigquery(publisher_id, True)
@@ -439,7 +439,7 @@ def generate_network_report(service, publisher_id, backfill=False, dry_run=True,
 
         data = process_batches(service, publisher_id, report_spec, batch_size, start_date, end_date)
     else:
-        _, data = execute_network_report_request(service, publisher_id, report_spec)
+        _, data = execute_mediation_report_request(service, publisher_id, report_spec)
 
     data = flatten_and_format_data(data)
 
@@ -514,7 +514,7 @@ def date_object_to_dict_object(date_object):
             'day': date_object.day
     }
 
-def setup_network_report_spec(date_range):
+def setup_mediation_report_spec(date_range):
     """
     Sets up the report parameters like dimensions, metrics, and sort conditions.
 
@@ -522,7 +522,7 @@ def setup_network_report_spec(date_range):
         date_range: The date range for the report.
 
     Returns:
-        dict: The network report specifications.
+        dict: The mediation report specifications.
     """
     dimensions = ['DATE', 'APP', 'COUNTRY']
     metrics = ['ESTIMATED_EARNINGS', 'IMPRESSIONS']
@@ -579,7 +579,7 @@ def determine_optimal_batch_size(service, publisher_id, report_spec, start_date,
     Args:
         service: The AdMob service object.
         publisher_id: The publisher ID.
-        report_spec: The specifications for the network report.
+        report_spec: The specifications for the mediation report.
         start_date: The start date of the report.
         end_date: The end date of the report.
 
@@ -593,8 +593,8 @@ def determine_optimal_batch_size(service, publisher_id, report_spec, start_date,
 
         report_spec["date_range"]["end_date"] = date_object_to_dict_object(end_date_mid)
 
-        # Execute the network report for the date range
-        num_rows, _ = execute_network_report_request(service, publisher_id, report_spec)
+        # Execute the mediation report for the date range
+        num_rows, _ = execute_mediation_report_request(service, publisher_id, report_spec)
 
         # Adjust the search range based on the number of rows
         if num_rows > 80000:  # Reduce the range if too many rows
@@ -611,11 +611,11 @@ def process_batches(service, publisher_id, report_spec, initial_batch_size, star
     Args:
         service: The AdMob service object.
         publisher_id: The publisher ID.
-        report_spec: The specifications for the network report.
+        report_spec: The specifications for the mediation report.
         initial_batch_size: The size of each batch in days.
 
     Returns:
-        list: The data from the network report.
+        list: The data from the mediation report.
     """
     batch_size = initial_batch_size
     offset = 0
@@ -633,7 +633,7 @@ def process_batches(service, publisher_id, report_spec, initial_batch_size, star
 
         custom_logging(f'Batch #{batch_count}: {report_spec["date_range"]}')
 
-        num_rows, response = execute_network_report_request(service, publisher_id, report_spec)
+        num_rows, response = execute_mediation_report_request(service, publisher_id, report_spec)
 
         if num_rows > 100000:
             logging.warning('Report not fully retrieved from the AdMob API due to number of rows in response exceeding 100k')
@@ -653,20 +653,20 @@ def process_batches(service, publisher_id, report_spec, initial_batch_size, star
 
     return data
 
-def execute_network_report_request(service, publisher_id, report_spec):
+def execute_mediation_report_request(service, publisher_id, report_spec):
     """
-    Executes the network report request and processes the response.
+    Executes the mediation report request and processes the response.
 
     Args:
         service: The AdMob service object.
         publisher_id: The publisher ID for the request.
-        report_spec: The specifications for the network report.
+        report_spec: The specifications for the mediation report.
 
     Returns:
         tuple: The number of rows in the report and the report data.
     """
     request = {'report_spec': report_spec}
-    response = service.accounts().networkReport().generate(
+    response = service.accounts().mediationReport().generate(
         parent=f'accounts/{publisher_id}', body=request).execute()
 
     if 'matchingRowCount' not in response[-1]['footer']:
@@ -922,8 +922,8 @@ def process_report_generation(service, pub_id_of_token, params):
     if populate_apps_list:
         list_apps(service, pub_id_of_token, dry_run)
 
-    # Generate the network report
-    generate_network_report(service, pub_id_of_token, backfill, dry_run, start_date, end_date)
+    # Generate the mediation report
+    generate_mediation_report(service, pub_id_of_token, backfill, dry_run, start_date, end_date)
 
 def main():
     """
