@@ -1,0 +1,6 @@
+google-analytics-data
+google-analytics-admin
+google-cloud-bigquery
+google-cloud-logging
+google-cloud-functions
+functions-framework==3.*
