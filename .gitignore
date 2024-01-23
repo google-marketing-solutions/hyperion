@@ -1,1 +1,8 @@
+*/.venv
+*/*.pickle
 .DS_Store
+*/.DS_Store
+*/*.json
+*/__pycache__
+.vscode
+analytics/responses

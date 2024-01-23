@@ -35,7 +35,6 @@ function enable_apis() {
   gcloud services enable 'cloudfunctions.googleapis.com'
   gcloud services enable 'appengine.googleapis.com'
   gcloud services enable 'cloudscheduler.googleapis.com'
-  gcloud services enable 'cloudbuild.googleapis.com'
 }
 
 function deploy_cloud_function() {
