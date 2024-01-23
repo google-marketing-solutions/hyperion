@@ -18,7 +18,6 @@ import json
 import logging
 import os
 import pytz
-import sys
 import time
 import traceback
 from flatten_json import flatten
@@ -319,7 +318,6 @@ def get_table_schema(reporting_table):
     Returns:
         List[bigquery.SchemaField]: The schema for the table.
     """
-    schema = None
     if reporting_table:
         # Define the schema for the reporting table
         schema = [
@@ -403,7 +401,7 @@ def log_bigquery_table_info(client, table_id):
 
 def generate_mediation_report(service, publisher_id, backfill=False, dry_run=True, start_date=None, end_date=None):
     """
-    Generates and prints a mediation report.
+    Generates and stores a mediation report.
 
     Args:
         service: An AdMob Service Object.
@@ -640,7 +638,7 @@ def process_batches(service, publisher_id, report_spec, initial_batch_size, star
             batch_size -= 2  # Aggressively decrease batch size to avoid hitting the record retrieval limit
             continue
 
-        data.extend(response[1:-1])  # Append the data from the current batch to the overall data list
+        data.extend(response)  # Append the data from the current batch to the overall data list
 
         # Increment the offset by the number of days in the current batch
         offset += batch_size

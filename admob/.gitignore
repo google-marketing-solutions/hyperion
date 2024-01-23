@@ -1,5 +1,0 @@
-.venv
-*.pickle
-.DS_Store
-*.json
-__pycache__
