@@ -29,6 +29,7 @@ import admob_utils
 TOKEN_NUMBER = 0
 TOTAL_TOKENS = 0
 
+
 def custom_logging(message):
     """
     Custom logging function that includes token information if provided.
@@ -39,7 +40,8 @@ def custom_logging(message):
     Returns:
         None
     """
-    print(f'Token # {TOKEN_NUMBER}/{TOTAL_TOKENS} - {message}')
+    print(f"Token # {TOKEN_NUMBER}/{TOTAL_TOKENS} - {message}")
+
 
 def list_apps(service, publisher_id, dry_run=False):
     """
@@ -53,10 +55,10 @@ def list_apps(service, publisher_id, dry_run=False):
     Returns:
         None
     """
-    custom_logging(f'Generating apps list for {publisher_id}')
+    custom_logging(f"Generating apps list for {publisher_id}")
 
     data = []
-    next_page_token = ''
+    next_page_token = ""
 
     while True:
         apps, next_page_token = fetch_apps_page(service, publisher_id, next_page_token)
@@ -79,6 +81,7 @@ def list_apps(service, publisher_id, dry_run=False):
         if did_update:
             log_bigquery_table_info(client, table_id)
 
+
 def fetch_apps_page(service, publisher_id, page_token):
     """
     Fetches a page of apps from the AdMob service.
@@ -91,19 +94,21 @@ def fetch_apps_page(service, publisher_id, page_token):
     Returns:
         Tuple[List[dict]| NoneType, str| NoneType]: A tuple containing a list of apps and the next page token.
     """
-    response = service.accounts().apps().list(
-        pageSize=100,
-        pageToken=page_token,
-        parent=f'accounts/{publisher_id}'
-    ).execute()
+    response = (
+        service.accounts()
+        .apps()
+        .list(pageSize=100, pageToken=page_token, parent=f"accounts/{publisher_id}")
+        .execute()
+    )
 
     # Check if the response is empty.
     if not response:
         return None, None
 
-    apps = response.get('apps', [])
-    next_page_token = response.get('nextPageToken')
+    apps = response.get("apps", [])
+    next_page_token = response.get("nextPageToken")
     return apps, next_page_token
+
 
 def is_android_and_google_play_app(app):
     """
@@ -116,11 +121,12 @@ def is_android_and_google_play_app(app):
         bool: True if the app is an Android app published on the Play Store, False otherwise.
     """
     return (
-        app['platform'] == 'ANDROID'
-            and 'linkedAppInfo' in app
-            and 'androidAppStores' in app['linkedAppInfo']
-            and 'GOOGLE_PLAY_APP_STORE' in app['linkedAppInfo']['androidAppStores']
+        app["platform"] == "ANDROID"
+        and "linkedAppInfo" in app
+        and "androidAppStores" in app["linkedAppInfo"]
+        and "GOOGLE_PLAY_APP_STORE" in app["linkedAppInfo"]["androidAppStores"]
     )
+
 
 def format_app_data(app):
     """
@@ -133,10 +139,11 @@ def format_app_data(app):
         dict: Formatted app data.
     """
     return {
-        'app_id': app['appId'],
-        'app_store_id': app['linkedAppInfo'].get('appStoreId'),
-        'app_store_display_name': app['linkedAppInfo'].get('displayName')
+        "app_id": app["appId"],
+        "app_store_id": app["linkedAppInfo"].get("appStoreId"),
+        "app_store_display_name": app["linkedAppInfo"].get("displayName"),
     }
+
 
 def compare_and_update_if_necessary(client, table_id, incoming_rows):
     """
@@ -169,6 +176,7 @@ def compare_and_update_if_necessary(client, table_id, incoming_rows):
         custom_logging("No new rows to insert.")
         return False
 
+
 def get_existing_apps_list(client, table_id):
     """
     Gets the existing apps list from BigQuery.
@@ -180,14 +188,15 @@ def get_existing_apps_list(client, table_id):
     Returns:
         A list of existing apps.
     """
-    query = f'''
+    query = f"""
         SELECT *
         FROM `{table_id}`
-    '''
+    """
 
     job = client.query(query)
     results = job.result()
     return results
+
 
 def dict_list_to_tuple_set(dict_list):
     """
@@ -200,6 +209,7 @@ def dict_list_to_tuple_set(dict_list):
         set: A set of tuples.
     """
     return set(tuple(sorted(d.items())) for d in dict_list)
+
 
 def handle_dry_run(data, publisher_id, reporting_table=False):
     """
@@ -214,19 +224,20 @@ def handle_dry_run(data, publisher_id, reporting_table=False):
     """
     try:
         json_string = json.dumps(data)
-        file_name = ''
+        file_name = ""
 
         if reporting_table:
-            file_name = f'mediation_reports {publisher_id}.json'
+            file_name = f"mediation_reports {publisher_id}.json"
         else:
-            file_name = f'apps_list {publisher_id}.json'
+            file_name = f"apps_list {publisher_id}.json"
 
-        with open(file_name, 'w') as outfile:
+        with open(file_name, "w") as outfile:
             outfile.write(json_string)
 
         custom_logging("Dry run complete (local machine).")
     except Exception as e:
         exception_logging(e)
+
 
 def exception_logging(e):
     """
@@ -241,6 +252,7 @@ def exception_logging(e):
     tb = traceback.format_exc()
     custom_logging(f"An error occurred: {e}\nTraceback: {tb}")
 
+
 def setup_bigquery(publisher_id, reporting_table=False):
     """
     Sets up the BigQuery dataset and table.
@@ -253,7 +265,7 @@ def setup_bigquery(publisher_id, reporting_table=False):
         bigquery.Client: The BigQuery client.
         str: The table ID.
     """
-    gcp_project = os.environ.get('GCP_PROJECT')
+    gcp_project = os.environ.get("GCP_PROJECT")
     dataset_id = "admob_reporting_data"
 
     if reporting_table:
@@ -266,6 +278,7 @@ def setup_bigquery(publisher_id, reporting_table=False):
     create_table(client, table_id, reporting_table)
 
     return client, table_id
+
 
 def create_dataset(client, dataset_id):
     """
@@ -284,6 +297,7 @@ def create_dataset(client, dataset_id):
     except NotFound:
         dataset = client.create_dataset(dataset_id)
         custom_logging(f"Dataset {dataset.dataset_id} created.")
+
 
 def create_table(client, table_id, reporting_table=False):
     """
@@ -308,6 +322,7 @@ def create_table(client, table_id, reporting_table=False):
         if reporting_table:
             configure_reporting_table(table, table_id)
 
+
 def get_table_schema(reporting_table):
     """
     Returns the schema for a table.
@@ -321,20 +336,33 @@ def get_table_schema(reporting_table):
     if reporting_table:
         # Define the schema for the reporting table
         schema = [
-            bigquery.SchemaField("dimensionValues_DATE_value", 'DATE', mode="NULLABLE"),
-            bigquery.SchemaField("dimensionValues_COUNTRY_value", 'STRING', mode="NULLABLE"),
-            bigquery.SchemaField("dimensionValues_APP_value", 'STRING', mode="NULLABLE"),
-            bigquery.SchemaField("dimensionValues_APP_displayLabel", 'STRING', mode="NULLABLE"),
-            bigquery.SchemaField("metricValues_ESTIMATED_EARNINGS_microsValue", 'INTEGER', mode="NULLABLE"),
-            bigquery.SchemaField("metricValues_IMPRESSIONS_integerValue", 'INTEGER', mode="NULLABLE"),
+            bigquery.SchemaField("dimensionValues_DATE_value", "DATE", mode="NULLABLE"),
+            bigquery.SchemaField(
+                "dimensionValues_COUNTRY_value", "STRING", mode="NULLABLE"
+            ),
+            bigquery.SchemaField(
+                "dimensionValues_APP_value", "STRING", mode="NULLABLE"
+            ),
+            bigquery.SchemaField(
+                "dimensionValues_APP_displayLabel", "STRING", mode="NULLABLE"
+            ),
+            bigquery.SchemaField(
+                "metricValues_ESTIMATED_EARNINGS_microsValue",
+                "INTEGER",
+                mode="NULLABLE",
+            ),
+            bigquery.SchemaField(
+                "metricValues_IMPRESSIONS_integerValue", "INTEGER", mode="NULLABLE"
+            ),
         ]
     else:
         schema = [
-            bigquery.SchemaField("app_id", 'STRING', mode="NULLABLE"),
-            bigquery.SchemaField("app_store_id", 'STRING', mode="NULLABLE"),
-            bigquery.SchemaField("app_store_display_name", 'STRING', mode="NULLABLE"),
+            bigquery.SchemaField("app_id", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("app_store_id", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("app_store_display_name", "STRING", mode="NULLABLE"),
         ]
     return schema
+
 
 def configure_reporting_table(table, table_id):
     """
@@ -353,8 +381,14 @@ def configure_reporting_table(table, table_id):
     )
     # Enable "require where clause to query data"
     table.require_partition_filter = True
-    table.clustering_fields = ["dimensionValues_APP_value", "dimensionValues_COUNTRY_value"]
-    custom_logging(f"Reporting table {table_id} configured with time partitioning and clustering.")
+    table.clustering_fields = [
+        "dimensionValues_APP_value",
+        "dimensionValues_COUNTRY_value",
+    ]
+    custom_logging(
+        f"Reporting table {table_id} configured with time partitioning and clustering."
+    )
+
 
 def load_data_to_bigquery(client, data, table_id):
     """
@@ -371,19 +405,20 @@ def load_data_to_bigquery(client, data, table_id):
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         autodetect=True,
-        write_disposition=bigquery.WriteDisposition.WRITE_APPEND
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
     )
 
     for i in range(5):  # max retries for load job
         try:
             job = client.load_table_from_json(data, table_id, job_config=job_config)
-            custom_logging(f'Job ID: {job.job_id}')
+            custom_logging(f"Job ID: {job.job_id}")
             job.result()  # Waits for the job to complete.
             break
         except Exception as e:
-            custom_logging(f'Error on attempt {i+1}:')
+            custom_logging(f"Error on attempt {i+1}:")
             exception_logging(e)
-            time.sleep(10 * (2 ** i)) # retry delay = 10
+            time.sleep(10 * (2**i))  # retry delay = 10
+
 
 def log_bigquery_table_info(client, table_id):
     """
@@ -397,9 +432,14 @@ def log_bigquery_table_info(client, table_id):
         None
     """
     table = client.get_table(table_id)  # Make an API request.
-    custom_logging(f"{table.num_rows} rows and {len(table.schema)} columns in {table_id}")
+    custom_logging(
+        f"{table.num_rows} rows and {len(table.schema)} columns in {table_id}"
+    )
 
-def generate_mediation_report(service, publisher_id, backfill=False, dry_run=True, start_date=None, end_date=None):
+
+def generate_mediation_report(
+    service, publisher_id, backfill=False, dry_run=True, start_date=None, end_date=None
+):
     """
     Generates and stores a mediation report.
 
@@ -414,7 +454,7 @@ def generate_mediation_report(service, publisher_id, backfill=False, dry_run=Tru
         None
 
     """
-    custom_logging(f'Generating mediation report for {publisher_id}')
+    custom_logging(f"Generating mediation report for {publisher_id}")
 
     date_range = setup_date_range_for_report(backfill, start_date, end_date)
 
@@ -426,16 +466,22 @@ def generate_mediation_report(service, publisher_id, backfill=False, dry_run=Tru
         client, table_id = setup_bigquery(publisher_id, True)
 
         if is_existing_data_in_date_range(client, table_id, end_date, start_date):
-            custom_logging(f"There are already rows in the table with the specified date value: {end_date} - {start_date}")
+            custom_logging(
+                f"There are already rows in the table with the specified date value: {end_date} - {start_date}"
+            )
             return
 
     data = []
 
     if backfill:
-        batch_size = determine_optimal_batch_size(service, publisher_id, report_spec, start_date, end_date)
-        custom_logging(f'Batch size (# of days): {batch_size}')
+        batch_size = determine_optimal_batch_size(
+            service, publisher_id, report_spec, start_date, end_date
+        )
+        custom_logging(f"Batch size (# of days): {batch_size}")
 
-        data = process_batches(service, publisher_id, report_spec, batch_size, start_date, end_date)
+        data = process_batches(
+            service, publisher_id, report_spec, batch_size, start_date, end_date
+        )
     else:
         _, data = execute_mediation_report_request(service, publisher_id, report_spec)
 
@@ -446,6 +492,7 @@ def generate_mediation_report(service, publisher_id, backfill=False, dry_run=Tru
     else:
         load_data_to_bigquery(client, data, table_id)
         log_bigquery_table_info(client, table_id)
+
 
 def setup_date_range_for_report(backfill, start_date, end_date):
     """
@@ -464,6 +511,7 @@ def setup_date_range_for_report(backfill, start_date, end_date):
     else:
         return create_date_range(end_date, end_date)
 
+
 def create_latest_date_to_run():
     """
     Provide a default latest date to run for when no dates were provided.
@@ -471,9 +519,16 @@ def create_latest_date_to_run():
     Returns:
         latest_date_to_run: The default latest date to run.
     """
-    tz = pytz.timezone('America/Los_Angeles')
+    tz = pytz.timezone("America/Los_Angeles")
     datetime_now = datetime.now(tz)
-    cloud_scheduler_time = datetime(year=datetime_now.year, month=datetime_now.month, day=datetime_now.day, hour=2, minute=0, tzinfo=tz)
+    cloud_scheduler_time = datetime(
+        year=datetime_now.year,
+        month=datetime_now.month,
+        day=datetime_now.day,
+        hour=2,
+        minute=0,
+        tzinfo=tz,
+    )
 
     if datetime_now < cloud_scheduler_time:
         latest_date_to_run = datetime_now.date() - timedelta(days=2)
@@ -481,6 +536,7 @@ def create_latest_date_to_run():
         latest_date_to_run = datetime_now.date() - timedelta(days=1)
 
     return latest_date_to_run
+
 
 def create_date_range(start_date, end_date):
     """Creates a date range dictionary with start and end dates.
@@ -493,9 +549,10 @@ def create_date_range(start_date, end_date):
         dict: A dictionary representing the date range.
     """
     return {
-        'start_date': date_object_to_dict_object(start_date),
-        'end_date': date_object_to_dict_object(end_date)
+        "start_date": date_object_to_dict_object(start_date),
+        "end_date": date_object_to_dict_object(end_date),
     }
+
 
 def date_object_to_dict_object(date_object):
     """Converts a date object to a dict object.
@@ -507,10 +564,11 @@ def date_object_to_dict_object(date_object):
         dict: A dictionary representing the date object.
     """
     return {
-            'year': date_object.year,
-            'month': date_object.month,
-            'day': date_object.day
+        "year": date_object.year,
+        "month": date_object.month,
+        "day": date_object.day,
     }
+
 
 def setup_mediation_report_spec(date_range):
     """
@@ -522,19 +580,20 @@ def setup_mediation_report_spec(date_range):
     Returns:
         dict: The mediation report specifications.
     """
-    dimensions = ['DATE', 'APP', 'COUNTRY']
-    metrics = ['ESTIMATED_EARNINGS', 'IMPRESSIONS']
-    sort_conditions = {'dimension': 'DATE', 'order': 'ASCENDING'}
-    dimension_filters = {'dimension': 'PLATFORM', 'matchesAny': {'values': ['Android']}}
+    dimensions = ["DATE", "APP", "COUNTRY"]
+    metrics = ["ESTIMATED_EARNINGS", "IMPRESSIONS"]
+    sort_conditions = {"dimension": "DATE", "order": "ASCENDING"}
+    dimension_filters = {"dimension": "PLATFORM", "matchesAny": {"values": ["Android"]}}
 
     return {
-        'date_range': date_range,
-        'dimensions': dimensions,
-        'metrics': metrics,
-        'sort_conditions': [sort_conditions],
-        'dimension_filters': [dimension_filters],
-        'localization_settings': {'currency_code': 'USD'},
+        "date_range": date_range,
+        "dimensions": dimensions,
+        "metrics": metrics,
+        "sort_conditions": [sort_conditions],
+        "dimension_filters": [dimension_filters],
+        "localization_settings": {"currency_code": "USD"},
     }
+
 
 def is_existing_data_in_date_range(client, table_id, end_date, start_date=None):
     """
@@ -549,28 +608,31 @@ def is_existing_data_in_date_range(client, table_id, end_date, start_date=None):
     Returns:
         int: 1 if data exists for the given date range, 0 otherwise.
     """
-    query = ''
+    query = ""
 
     if start_date:
-        query = f'''
+        query = f"""
             SELECT *
             FROM `{table_id}`
             WHERE dimensionValues_DATE_value BETWEEN '{start_date.strftime("%Y-%m-%d")}' and '{end_date.strftime("%Y-%m-%d")}'
             LIMIT 10
-        '''
+        """
     else:
-        query = f'''
+        query = f"""
             SELECT *
             FROM `{table_id}`
             WHERE dimensionValues_DATE_value = '{end_date.strftime("%Y-%m-%d")}'
             LIMIT 10
-        '''
+        """
 
     job = client.query(query)
     results = job.result()
     return 1 if results.total_rows > 0 else 0
 
-def determine_optimal_batch_size(service, publisher_id, report_spec, start_date, end_date):
+
+def determine_optimal_batch_size(
+    service, publisher_id, report_spec, start_date, end_date
+):
     """
     Performs a binary search to find the optimal end date for backfilling.
 
@@ -592,7 +654,9 @@ def determine_optimal_batch_size(service, publisher_id, report_spec, start_date,
         report_spec["date_range"]["end_date"] = date_object_to_dict_object(end_date_mid)
 
         # Execute the mediation report for the date range
-        num_rows, _ = execute_mediation_report_request(service, publisher_id, report_spec)
+        num_rows, _ = execute_mediation_report_request(
+            service, publisher_id, report_spec
+        )
 
         # Adjust the search range based on the number of rows
         if num_rows > 80000:  # Reduce the range if too many rows
@@ -602,7 +666,10 @@ def determine_optimal_batch_size(service, publisher_id, report_spec, start_date,
 
     return right
 
-def process_batches(service, publisher_id, report_spec, initial_batch_size, start_date, end_date):
+
+def process_batches(
+    service, publisher_id, report_spec, initial_batch_size, start_date, end_date
+):
     """
     Processes batches of data, adjusting the date range for each batch.
 
@@ -621,24 +688,32 @@ def process_batches(service, publisher_id, report_spec, initial_batch_size, star
     data = []
     while True:
         batch_start_date = start_date + timedelta(days=max(offset, 0))
-        batch_end_date = min(batch_start_date + timedelta(days=batch_size - 1), end_date)
+        batch_end_date = min(
+            batch_start_date + timedelta(days=batch_size - 1), end_date
+        )
         batch_count += 1
 
         report_spec["date_range"] = {
-            'start_date': date_object_to_dict_object(batch_start_date),
-            'end_date': date_object_to_dict_object(batch_end_date)
+            "start_date": date_object_to_dict_object(batch_start_date),
+            "end_date": date_object_to_dict_object(batch_end_date),
         }
 
         custom_logging(f'Batch #{batch_count}: {report_spec["date_range"]}')
 
-        num_rows, response = execute_mediation_report_request(service, publisher_id, report_spec)
+        num_rows, response = execute_mediation_report_request(
+            service, publisher_id, report_spec
+        )
 
         if num_rows > 100000:
-            logging.warning('Report not fully retrieved from the AdMob API due to number of rows in response exceeding 100k')
+            logging.warning(
+                "Report not fully retrieved from the AdMob API due to number of rows in response exceeding 100k"
+            )
             batch_size -= 2  # Aggressively decrease batch size to avoid hitting the record retrieval limit
             continue
 
-        data.extend(response)  # Append the data from the current batch to the overall data list
+        data.extend(
+            response
+        )  # Append the data from the current batch to the overall data list
 
         # Increment the offset by the number of days in the current batch
         offset += batch_size
@@ -647,9 +722,10 @@ def process_batches(service, publisher_id, report_spec, initial_batch_size, star
         if batch_end_date == end_date:
             break
 
-    custom_logging(f'Processed {batch_count} batches')
+    custom_logging(f"Processed {batch_count} batches")
 
     return data
+
 
 def execute_mediation_report_request(service, publisher_id, report_spec):
     """
@@ -663,17 +739,24 @@ def execute_mediation_report_request(service, publisher_id, report_spec):
     Returns:
         tuple: The number of rows in the report and the report data.
     """
-    request = {'report_spec': report_spec}
-    response = service.accounts().mediationReport().generate(
-        parent=f'accounts/{publisher_id}', body=request).execute()
+    request = {"report_spec": report_spec}
+    response = (
+        service.accounts()
+        .mediationReport()
+        .generate(parent=f"accounts/{publisher_id}", body=request)
+        .execute()
+    )
 
-    if 'matchingRowCount' not in response[-1]['footer']:
-        custom_logging('Warning: This account does not contain any records for this dates.')
+    if "matchingRowCount" not in response[-1]["footer"]:
+        custom_logging(
+            "Warning: This account does not contain any records for this dates."
+        )
         return 0, []
 
-    num_rows = int(response[-1]['footer']['matchingRowCount'])
+    num_rows = int(response[-1]["footer"]["matchingRowCount"])
     data = response[1:-1]
     return num_rows, data
+
 
 def flatten_and_format_data(data):
     """
@@ -687,12 +770,13 @@ def flatten_and_format_data(data):
     """
     processed_data = []
     for row in data:
-        flattened_row = flatten(row['row'])
+        flattened_row = flatten(row["row"])
         if should_remove_row(flattened_row):
             continue
         processed_row = post_process_flattened_row(flattened_row)
         processed_data.append(processed_row)
     return processed_data
+
 
 def should_remove_row(row):
     """
@@ -705,10 +789,14 @@ def should_remove_row(row):
         bool: True if the row should be removed, False otherwise.
     """
     # Remove entries with zero impressions and earnings
-    if (row.get('metricValues_IMPRESSIONS_integerValue') == 0 and row.get('metricValues_ESTIMATED_EARNINGS_microsValue') == 0):
+    if (
+        row.get("metricValues_IMPRESSIONS_integerValue") == 0
+        and row.get("metricValues_ESTIMATED_EARNINGS_microsValue") == 0
+    ):
         return True
     else:
         return False
+
 
 def post_process_flattened_row(row):
     """
@@ -721,17 +809,24 @@ def post_process_flattened_row(row):
         dict: The post-processed data row.
     """
     # Handling missing 'dimensionValues_COUNTRY_value'
-    if 'dimensionValues_COUNTRY' in row:
-        row.pop('dimensionValues_COUNTRY')
-        row['dimensionValues_COUNTRY_value'] = 'Unknown Region'
+    if "dimensionValues_COUNTRY" in row:
+        row.pop("dimensionValues_COUNTRY")
+        row["dimensionValues_COUNTRY_value"] = "Unknown Region"
 
     # Formatting 'dimensionValues_DATE_value'
-    if 'dimensionValues_DATE_value' in row:
-        date_string = row['dimensionValues_DATE_value']
-        year, month, day = int(date_string[:4]), int(date_string[4:6]), int(date_string[6:])
-        row['dimensionValues_DATE_value'] = datetime(year, month, day).strftime("%Y-%m-%d")
+    if "dimensionValues_DATE_value" in row:
+        date_string = row["dimensionValues_DATE_value"]
+        year, month, day = (
+            int(date_string[:4]),
+            int(date_string[4:6]),
+            int(date_string[6:]),
+        )
+        row["dimensionValues_DATE_value"] = datetime(year, month, day).strftime(
+            "%Y-%m-%d"
+        )
 
     return row
+
 
 @functions_framework.cloud_event
 def admob_report_main(cloud_event):
@@ -750,6 +845,7 @@ def admob_report_main(cloud_event):
     validate_params(params)
 
     iterate_over_tokens(params)
+
 
 def extract_parameters_from_event(cloud_event):
     """
@@ -774,13 +870,13 @@ def extract_parameters_from_event(cloud_event):
 
         # Convert dry_run, populate_apps_list and backfill to boolean if necessary
         dry_run = attr_dic.get("dry_run", dry_run)
-        dry_run = dry_run in ['True', 'true', 'TRUE']
+        dry_run = dry_run in ["True", "true", "TRUE"]
 
         populate_apps_list = attr_dic.get("populate_apps_list", populate_apps_list)
-        populate_apps_list = populate_apps_list in ['True', 'true', 'TRUE']
+        populate_apps_list = populate_apps_list in ["True", "true", "TRUE"]
 
         backfill = attr_dic.get("backfill", backfill)
-        backfill = backfill in ['True', 'true', 'TRUE']
+        backfill = backfill in ["True", "true", "TRUE"]
 
     return {
         "specified_pub_id": specified_pub_id,
@@ -790,6 +886,7 @@ def extract_parameters_from_event(cloud_event):
         "populate_apps_list": populate_apps_list,
         "backfill": backfill,
     }
+
 
 def validate_params(params):
     """
@@ -809,9 +906,12 @@ def validate_params(params):
         error_msg = "Backfill is enabled but no start date is specified."
         raise ValueError(error_msg)
 
-    params["start_date"], params["end_date"] = handle_dates_for_backfill_scenario(start_date, end_date)
+    params["start_date"], params["end_date"] = handle_dates_for_backfill_scenario(
+        start_date, end_date
+    )
 
     return params
+
 
 def handle_dates_for_backfill_scenario(start_date, end_date):
     """
@@ -832,10 +932,13 @@ def handle_dates_for_backfill_scenario(start_date, end_date):
         end_date = create_latest_date_to_run()
 
     if end_date and start_date and start_date > end_date:
-        error_msg = f'Start date {start_date} must be before or equal to end date {end_date}.'
+        error_msg = (
+            f"Start date {start_date} must be before or equal to end date {end_date}."
+        )
         raise ValueError(error_msg)
 
     return start_date, end_date
+
 
 def create_date_object(date_string):
     """
@@ -848,9 +951,10 @@ def create_date_object(date_string):
         datetime.date: The date object.
     """
 
-    year, month, day = date_string.split('-')
+    year, month, day = date_string.split("-")
 
     return datetime(year=int(year), month=int(month), day=int(day)).date()
+
 
 def iterate_over_tokens(params):
     """
@@ -864,7 +968,7 @@ def iterate_over_tokens(params):
     """
     global TOTAL_TOKENS, TOKEN_NUMBER
 
-    token_files = admob_utils.list_files_with_prefix('token')
+    token_files = admob_utils.list_files_with_prefix("token")
 
     TOTAL_TOKENS = len(token_files)
 
@@ -881,7 +985,7 @@ def iterate_over_tokens(params):
             if specified_pub_id:
                 if specified_pub_id == pub_id_of_token:
                     TOTAL_TOKENS = 1
-                    TOKEN_NUMBER =  1
+                    TOKEN_NUMBER = 1
                 else:
                     continue
 
@@ -892,6 +996,7 @@ def iterate_over_tokens(params):
 
         except Exception as e:
             exception_logging(e)
+
 
 def process_report_generation(service, pub_id_of_token, params):
     """
@@ -921,7 +1026,10 @@ def process_report_generation(service, pub_id_of_token, params):
         list_apps(service, pub_id_of_token, dry_run)
 
     # Generate the mediation report
-    generate_mediation_report(service, pub_id_of_token, backfill, dry_run, start_date, end_date)
+    generate_mediation_report(
+        service, pub_id_of_token, backfill, dry_run, start_date, end_date
+    )
+
 
 def main():
     """
@@ -937,6 +1045,7 @@ def main():
 
     iterate_over_tokens(params)
 
+
 def process_cli_args():
     """
     Processes command-line arguments.
@@ -946,13 +1055,45 @@ def process_cli_args():
     """
     # Check for command-line flags
     parser = argparse.ArgumentParser(description="Process command line flags.")
-    parser.add_argument('-p', '--specified-pub-id', type=str, help="Specify a Publisher ID to only run reports for that ID.")
-    parser.add_argument('-sd', '--start-date', type=str, help="Start date in YYYY-MM-DD format.")
-    parser.add_argument('-ed', '--end-date', type=str, help="End date in YYYY-MM-DD format. Defaults to today if not specified")
-    parser.add_argument('-r', '--disable-dry-run', action='store_false', help="Execute a dry run without making any actual changes. Defaults to True if not specified.")
-    parser.add_argument('-a', '--populate-apps-list', action='store_true', help="Populate the applications list. Use this flag to enable this feature.")
-    parser.add_argument('-b', '--backfill', action='store_true', help="Enable backfilling of data. Use this flag to activate backfill.")
-    parser.add_argument('-t', '--generate-token-only', action='store_true', help="Generate an access token only")
+    parser.add_argument(
+        "-p",
+        "--specified-pub-id",
+        type=str,
+        help="Specify a Publisher ID to only run reports for that ID.",
+    )
+    parser.add_argument(
+        "-sd", "--start-date", type=str, help="Start date in YYYY-MM-DD format."
+    )
+    parser.add_argument(
+        "-ed",
+        "--end-date",
+        type=str,
+        help="End date in YYYY-MM-DD format. Defaults to today if not specified",
+    )
+    parser.add_argument(
+        "-r",
+        "--disable-dry-run",
+        action="store_false",
+        help="Execute a dry run without making any actual changes. Defaults to True if not specified.",
+    )
+    parser.add_argument(
+        "-a",
+        "--populate-apps-list",
+        action="store_true",
+        help="Populate the applications list. Use this flag to enable this feature.",
+    )
+    parser.add_argument(
+        "-b",
+        "--backfill",
+        action="store_true",
+        help="Enable backfilling of data. Use this flag to activate backfill.",
+    )
+    parser.add_argument(
+        "-t",
+        "--generate-token-only",
+        action="store_true",
+        help="Generate an access token only",
+    )
     args = parser.parse_args()
 
     # Store the value of the --disable-dry-run flag in the variable dry_run
@@ -965,8 +1106,9 @@ def process_cli_args():
         "dry_run": dry_run,
         "populate_apps_list": args.populate_apps_list,
         "backfill": args.backfill,
-        "generate_token_only": args.generate_token_only
+        "generate_token_only": args.generate_token_only,
     }
+
 
 # Entry point for the script
 if __name__ == "__main__":
