@@ -158,7 +158,7 @@ def run_report(data_client, admin_client, property_id, start_date, end_date):
         dimensions=[
             Dimension(name="date"),
             Dimension(name="streamId"),
-            Dimension(name="country"),
+            Dimension(name="countryId"),
         ],
         metrics=[
             Metric(name="active1DayUsers"),
@@ -169,6 +169,7 @@ def run_report(data_client, admin_client, property_id, start_date, end_date):
             Metric(name="wauPerMau"),
             Metric(name="purchaseRevenue"),
             Metric(name="averagePurchaseRevenuePerPayingUser"),
+            Metric(name="averageRevenuePerUser"),
             Metric(name="averageSessionDuration"),
         ],
         date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
@@ -237,14 +238,12 @@ def format_data_for_saving(response, admin_client, property_id):
         for header, value in zip(metric_headers, row.metric_values):
             if header in ["active1DayUsers", "active7DayUsers", "active28DayUsers"]:
                 row_dict[header] = int(value.value)
-            elif header in [
-                "dauPerMau",
-                "dauPerWau",
-                "wauPerMau",
-                "purchaseRevenue",
-                "totalAdRevenue",
-                "averagePurchaseRevenuePerUser",
-                "averageSessionDuration",
+            elif header not in [
+                "date",
+                "streamId",
+                "active1DayUsers",
+                "active7DayUsers",
+                "active28DayUsers",
             ]:
                 row_dict[header] = float(value.value)
 
@@ -339,11 +338,10 @@ def get_table_schema():
         List[bigquery.SchemaField]: The schema for the table.
     """
     schema = [
-        bigquery.SchemaField(
-            "date", "DATE"
-        ),  # Assuming 'date' is in 'YYYY-MM-DD' format
-        bigquery.SchemaField("appId", "STRING"),  # Assuming 'appId' is a string
-        bigquery.SchemaField("country", "STRING"),  # Assuming 'country' is a string
+        # Dimensions
+        bigquery.SchemaField("date", "DATE"),
+        bigquery.SchemaField("appId", "STRING"),
+        bigquery.SchemaField("countryId", "STRING"),
         # Metrics
         bigquery.SchemaField("active1DayUsers", "INTEGER"),
         bigquery.SchemaField("active7DayUsers", "INTEGER"),
@@ -352,8 +350,8 @@ def get_table_schema():
         bigquery.SchemaField("dauPerWau", "FLOAT"),
         bigquery.SchemaField("wauPerMau", "FLOAT"),
         bigquery.SchemaField("purchaseRevenue", "FLOAT"),
-        bigquery.SchemaField("totalAdRevenue", "FLOAT"),
-        bigquery.SchemaField("averagePurchaseRevenuePerUser", "FLOAT"),
+        bigquery.SchemaField("averagePurchaseRevenuePerPayingUser", "FLOAT"),
+        bigquery.SchemaField("averageRevenuePerUser", "FLOAT"),
         bigquery.SchemaField("averageSessionDuration", "FLOAT"),
     ]
     return schema
