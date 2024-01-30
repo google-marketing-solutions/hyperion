@@ -24,7 +24,7 @@ source .venv/bin/activate
 pip install --require-hashes -r requirements.txt
 
 # run main script
-python3 main.py --generate-token-only=true
+python3 main.py --generate-token-only
 
 # deactivate the virtual environment
 deactivate
