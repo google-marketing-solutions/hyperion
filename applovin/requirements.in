@@ -1,7 +1,6 @@
 python-dotenv
 pyyaml
-google-analytics-data
-google-analytics-admin
+requests
 google-cloud-bigquery
 google-cloud-logging
 google-cloud-functions

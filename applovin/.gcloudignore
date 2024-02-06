@@ -20,5 +20,4 @@ responses
 __pycache__
 
 README.md
-*.json
 .*env.local
