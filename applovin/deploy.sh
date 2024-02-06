@@ -41,27 +41,25 @@ function enable_apis() {
     iam.googleapis.com \
     appengine.googleapis.com \
     cloudscheduler.googleapis.com \
-    bigquery.googleapis.com \
-    analyticsdata.googleapis.com \
-    analyticsadmin.googleapis.com
+    bigquery.googleapis.com
 }
 
-function deploy_cloud_function() {
-  echo "Creating scheduler job analytics_data_scheduler and PubSub topic analytics_data"
+function deploy_cloud_function() {  
+  echo "Creating scheduler job applovin_data_scheduler and PubSub topic applovin_data"
   gcloud scheduler jobs create pubsub \
-    "analytics_data_scheduler" \
+    "applovin_data_scheduler" \
     --schedule "30 1 * * *" \
-    --topic analytics_data \
+    --topic applovin_data \
     --location us-central1 \
-    --time-zone="Europe/London" \
+    --time-zone="Etc/UTC" \
     --message-body "send" \
     --project ${PROJECT}
 
-  echo "Creating PubSub topic analytics_data"
-  gcloud pubsub topics create analytics_data
+  echo "Creating PubSub topic applovin_data"
+  gcloud pubsub topics create applovin_data
 
-  echo "Deploying fetch analytics report Cloud Function"
-  gcloud functions deploy analytics_data \
+  echo "Deploying fetch applovin report Cloud Function"
+  gcloud functions deploy applovin_data \
     --gen2 \
     --region us-central1 \
     --runtime python311 \
@@ -70,9 +68,8 @@ function deploy_cloud_function() {
     --source . \
     --memory 2048MB \
     --timeout 540s \
-    --trigger-topic analytics_data \
-    --project ${PROJECT} \
-    --service-account analytics-data@${PROJECT}.iam.gserviceaccount.com
+    --trigger-topic applovin_data \
+    --project ${PROJECT}
 }
 
 function deploy_all() {

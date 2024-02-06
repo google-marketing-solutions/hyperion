@@ -1,0 +1,42 @@
+dataset_name: analytics_reporting_data
+table:
+  name_prefix: analytics_report_
+  schema:
+    dimensions:
+      - name: date
+        type: DATE
+      - name: appId
+        type: STRING
+        api_name: streamId
+      - name: countryId
+        type: STRING
+    metrics:
+      # limited to 10 metrics by the analytics API
+      - name: active1DayUsers
+        type: INTEGER
+      - name: active7DayUsers
+        type: INTEGER
+      - name: active28DayUsers
+        type: INTEGER
+      - name: dauPerMau
+        type: FLOAT
+      - name: dauPerWau
+        type: FLOAT
+      # - name: wauPerMau
+      #   type: FLOAT
+      - name: totalAdRevenue
+        type: FLOAT
+      - name: purchaseRevenue
+        type: FLOAT
+      - name: averagePurchaseRevenuePerPayingUser
+        type: FLOAT
+      - name: averageRevenuePerUser
+        type: FLOAT
+      - name: averageSessionDuration
+        type: FLOAT
+  partition_field: date
+  clustering_fields:
+    - appId
+    - countryId
+local_dir_name: responses
+local_file_name_prefix: data_from_response_

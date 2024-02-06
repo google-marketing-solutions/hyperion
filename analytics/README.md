@@ -7,5 +7,5 @@
 # To deploy the script to GCP
 `$ sh deploy.sh --project cloud-project-id`
 
-# To backfill in bulk automatically
-`$ sh backfill.sh`
+# To backfill in bulk automatically (define start date as in the format below)
+`$ sh backfill.sh YYYY-mm-dd`
