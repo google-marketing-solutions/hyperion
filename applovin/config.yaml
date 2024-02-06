@@ -1,0 +1,24 @@
+dataset_name: applovin_reporting_data
+table:
+  name: applovin_report
+  schema:
+    dimensions:
+      - name: day
+        type: DATE
+      - name: application
+        type: STRING
+      - name: package_name
+        type: STRING
+      - name: country
+        type: STRING
+    metrics:
+      - name: impressions
+        type: INTEGER
+      - name: revenue
+        type: FLOAT
+  partition_field: day
+  clustering_fields:
+    - package_name
+    - country
+local_dir_name: responses
+local_file_name: data_from_response
