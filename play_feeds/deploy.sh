@@ -40,14 +40,26 @@ function enable_apis() {
 }
 
 function deploy_cloud_function() {
-  echo "Creating scheduler job play_feeds_scheduler and PubSub topic ${TOPIC}"
+  echo "Creating scheduler job play_feeds_scheduler"
   gcloud scheduler jobs create pubsub \
     "play_feeds_scheduler" \
     --schedule "0 6 * * *" \
     --topic "${TOPIC}" \
-    --attributes dry_run="${TEST}" \
+    --attributes dry_run="${TEST}",report_requested="installs" \
     --location us-central1 \
     --project ${PROJECT}
+
+  echo "Creating scheduler job play_feeds_earnings_scheduler"
+  gcloud scheduler jobs create pubsub \
+    "play_feeds_earnings_scheduler" \
+    --schedule "0 0 6 * *" \
+    --topic "${TOPIC}" \
+    --attributes dry_run="${TEST}",report_requested="earnings" \
+    --location us-central1 \
+    --project ${PROJECT}
+
+  echo "Creating PubSub topic ${TOPIC}"
+  gcloud pubsub topics create ${TOPIC}
 
   echo "Creating PubSub backfill topic ${TOPIC}_backfill"
   gcloud pubsub topics create ${TOPIC}_backfill

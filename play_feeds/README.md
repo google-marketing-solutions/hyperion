@@ -18,25 +18,11 @@ mappings:
 - `bucket`: Google Cloud Storage bucket storing reports starting with pubsite_prod.
 - `table_suffix` is suffix of table, e.g if the value is ABC, Installs country report table be in \`project_id.play_console_reports.p_Installs_country_ABC\`
 
-## Authorize
-Make sure you are in the correct cloud project that the solution should deploy
+3. Make sure you are in the correct cloud project that the solution should deploy
 to. Otherwise, run:
 ```
 gcloud config set project ${PROJECT}
 ```
-
-Run the following command to generate Application Default Credentials:
-```
-gcloud auth application-default login
-```
-
-Copy the application_default_credentials.json to this project folder. Run:
-```
-cp <source_application_default_credentials_json> .
-```
-<source_application_default_credentials_json> file can be found in:
-- Linux, macOS: `$HOME/.config/gcloud/application_default_credentials.json`
-- Windows: `%APPDATA%\gcloud\application_default_credentials.json`
 
 ## Deploy development
 Run
