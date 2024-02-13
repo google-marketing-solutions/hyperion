@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-start_date=${1:-"2023-01-01"} 
+start_date=${1:-"2023-01-01"}
 time_zone=${3:-"Europe/London"}
 
 if [ -z "$2" ]; then

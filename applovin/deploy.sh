@@ -44,7 +44,7 @@ function enable_apis() {
     bigquery.googleapis.com
 }
 
-function deploy_cloud_function() {  
+function deploy_cloud_function() {
   echo "Creating scheduler job applovin_data_scheduler and PubSub topic applovin_data"
   gcloud scheduler jobs create pubsub \
     "applovin_data_scheduler" \
