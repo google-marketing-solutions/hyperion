@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project=$1
-start_date=${2:-"2022-01-01"}
-time_zone=${4:-"Europe/London"}
 
-echo "Setting project..."
-gcloud config set project $1
+# Usage:
+
+# sh backfill.sh project_id start_date end_date time_zone pub_id
+
+project_id=$1
+start_date=${2:-"2022-01-01"}
+time_zone=${4:-"America/Los_Angeles"}
+
+# Run the gcloud commands
+gcloud config set project ${project_id}
 
 if [ -z "$3" ]; then
     # If $2 is not provided, use the current date minus one in the specified time zone
@@ -27,11 +32,13 @@ else
     end_date=$3
 fi
 
+pub_id=${5:-""}
+
 current_date=$start_date
 
 while [[ $(date -j -f "%Y-%m-%d" "$current_date" +%s) -le $(date -j -f "%Y-%m-%d" "$end_date" +%s) ]]; do
     # Calculate the date two months ahead
-    next_date=$(date -j -v+60d -f "%Y-%m-%d" "$current_date" +%Y-%m-%d)
+    next_date=$(date -j -v+90d -f "%Y-%m-%d" "$current_date" +%Y-%m-%d)
 
     # Ensure we do not pass the end date
     if [[ $(date -j -f "%Y-%m-%d" "$next_date" +%s) -gt $(date -j -f "%Y-%m-%d" "$end_date" +%s) ]]; then
@@ -39,12 +46,10 @@ while [[ $(date -j -f "%Y-%m-%d" "$current_date" +%s) -le $(date -j -f "%Y-%m-%d
     fi
 
     echo $current_date - $next_date
-    # Run the gcloud command
-    gcloud pubsub topics publish analytics_data --attribute=start_date=$current_date,end_date=$next_date
+    gcloud pubsub topics publish get_admob_reports --attribute=start_date=$current_date,end_date=$next_date,populate_apps_list=true,backfill=true,pub_id=$pub_id
 
     # Update current_date to the next_date + 1
     current_date=$(date -j -v+1d -f "%Y-%m-%d" "$next_date" +%Y-%m-%d)
 
-    # Delay for 5 seconds before the next iteration
     sleep 120
 done

@@ -20,32 +20,43 @@
  *       loads the report to BigQuery.
  */
 
-// Set backfill to true if wanting to backfill
-var backfill = true
+// TODO: Set/Check the variables in the box below BEFORE running the script
+// ---------------------------------------- //
+// ---------------------------------------- //
+// Set backfill to true if you want to run a backfill. Set it to false after the backfill has completed.
+var backfill = false;
+// Set timezone of the MCC account, e.g. "Asia/Karachi"
+var timezone_MCC = "Asia/Karachi";
+// Set backfill_start_date and backfill_end_date to the date range which you want to backfill. Required if backfill is set to true.
+// using the YYYY-MM-DD format
+var backfill_start_date = "2022-01-01";
+var backfill_end_date = "2022-04-01";
+// GCP project id of the project to store the reports in
+var project_id = "project id here";
+// ---------------------------------------- //
+// ---------------------------------------- //
 
-// Set backfill_start_date and backfill_end_date to the date range which you want to backfill. Required if backfill is set to true
-var backfill_start_date = '<start date in this format: "2022-02-01">' 
-var backfill_end_date = '<end date in this format: "2022-02-01">'
+var today = new Date();
+var yesterday = new Date(today);
+yesterday.setDate(yesterday.getDate() - 1);
 
-var today = new Date()
-var yesterday = new Date(today)
-yesterday.setDate(yesterday.getDate() - 1)
-var timezone_MCC = '<timezone of the MCC account, e.g. "Asia/Karachi">'
-var yesterdayFormatted = Utilities.formatDate(yesterday, timezone_MCC, 'YYYY-MM-dd')
+var yesterdayFormatted = Utilities.formatDate(
+  yesterday,
+  timezone_MCC,
+  "YYYY-MM-dd"
+);
 
 var CONFIG = {
-  BIGQUERY_PROJECT_ID: '<project id>',
-  BIGQUERY_DATASET_ID: '<dataset id>',
+  BIGQUERY_PROJECT_ID: project_id,
+  BIGQUERY_DATASET_ID: "ads_reporting_data",
 
   // Truncate existing data, otherwise will append.
   TRUNCATE_EXISTING_DATASET: false,
   TRUNCATE_EXISTING_TABLES: false,
 
   // Lists of reports and fields to retrieve from Google Ads.
-  REPORTS: [],
+  CUSTOMER_IDS_AND_REPORTS: {},
 };
-
-var ACCOUNTS_LIST = []
 
 // Impose a limit on the size of BQ inserts: 10MB - 512Kb for overheads.
 var MAX_INSERT_SIZE = 10 * 1024 * 1024 - 512 * 1024;
@@ -55,35 +66,54 @@ var MAX_INSERT_SIZE = 10 * 1024 * 1024 - 512 * 1024;
  */
 function main() {
   createDataset();
-  var childAccounts = AdsManagerApp.accounts().get()
-  while(childAccounts.hasNext()) {
-    var childAccount = childAccounts.next()
-    var customerID = childAccount.getCustomerId()
-    CONFIG.REPORTS.push({
-      NAME: 'google_ads_report_' + customerID,
-      CONDITIONS: 'WHERE IsTargetingLocation IN [true,false]',
-      FIELDS: {'Paid_Installs' : 'INT64',
-              'Cost' : 'INT64',
-              'Country' : 'STRING',
-              'App_ID': 'STRING',
-              'Currency': 'STRING',
-              'Date' : 'DATE',
-              },
-    })
-    ACCOUNTS_LIST.push(childAccount)
-  }
 
-  for (var i = 0; i < CONFIG.REPORTS.length; i++) {
-    var reportConfig = CONFIG.REPORTS[i];
-    createTable(reportConfig);
+  var childAccounts = AdsManagerApp.accounts().get();
+  while (childAccounts.hasNext()) {
+    var childAccount = childAccounts.next();
+    var customerID = childAccount.getCustomerId();
+
+    CONFIG.CUSTOMER_IDS_AND_REPORTS[customerID] = [];
+    CONFIG.CUSTOMER_IDS_AND_REPORTS[customerID].push({
+      NAME: "google_ads_cost_report_" + customerID,
+      FIELDS: {
+        Cost: "INT64",
+        Country: "STRING",
+        App_ID: "STRING",
+        Currency: "STRING",
+        Date: "DATE",
+      },
+    });
+    CONFIG.CUSTOMER_IDS_AND_REPORTS[customerID].push({
+      NAME: "google_ads_install_report_" + customerID,
+      FIELDS: {
+        Paid_Installs: "INT64",
+        Country: "STRING",
+        App_ID: "STRING",
+        Date: "DATE",
+      },
+    });
+
+    var REPORTS = CONFIG.CUSTOMER_IDS_AND_REPORTS[customerID];
+    for (var i = 0; i < REPORTS.length; i++) {
+      var reportConfig = REPORTS[i];
+      createTable(reportConfig);
+    }
   }
 
   if (backfill == true) {
-    Logger.log("Backfilling for period: " + backfill_start_date + " to " + backfill_end_date)
+    Logger.log(
+      "Backfilling for period: " +
+        backfill_start_date +
+        " to " +
+        backfill_end_date
+    );
   }
 
-  var jobIds = processReports();
-  waitTillJobsComplete(jobIds);
+  AdsManagerApp.accounts().executeInParallel(
+    "processReports",
+    "waitTillJobsComplete",
+    JSON.stringify(CONFIG.CUSTOMER_IDS_AND_REPORTS)
+  );
 }
 
 /**
@@ -94,14 +124,19 @@ function main() {
  * set, then will not create a new dataset.
  */
 function createDataset() {
-   if (datasetExists()) {
+  if (datasetExists()) {
     if (CONFIG.TRUNCATE_EXISTING_DATASET) {
-      BigQuery.Datasets.remove(CONFIG.BIGQUERY_PROJECT_ID,
-        CONFIG.BIGQUERY_DATASET_ID, {'deleteContents' : true});
-      Logger.log('Truncated dataset.');
+      BigQuery.Datasets.remove(
+        CONFIG.BIGQUERY_PROJECT_ID,
+        CONFIG.BIGQUERY_DATASET_ID,
+        { deleteContents: true }
+      );
+      Logger.log("Truncated dataset.");
     } else {
-      Logger.log('Dataset %s already exists.  Will not recreate.',
-       CONFIG.BIGQUERY_DATASET_ID);
+      Logger.log(
+        "Dataset %s already exists.  Will not recreate.",
+        CONFIG.BIGQUERY_DATASET_ID
+      );
       return;
     }
   }
@@ -114,7 +149,7 @@ function createDataset() {
   dataSet.datasetReference.datasetId = CONFIG.BIGQUERY_DATASET_ID;
 
   dataSet = BigQuery.Datasets.insert(dataSet, CONFIG.BIGQUERY_PROJECT_ID);
-  Logger.log('Created dataset with id %s.', dataSet.id);
+  Logger.log("Created dataset with id %s.", dataSet.id);
 }
 
 /**
@@ -152,12 +187,17 @@ function datasetExists() {
 function createTable(reportConfig) {
   if (tableExists(reportConfig.NAME)) {
     if (CONFIG.TRUNCATE_EXISTING_TABLES) {
-      BigQuery.Tables.remove(CONFIG.BIGQUERY_PROJECT_ID,
-          CONFIG.BIGQUERY_DATASET_ID, reportConfig.NAME);
-      Logger.log('Truncated table %s.', reportConfig.NAME);
+      BigQuery.Tables.remove(
+        CONFIG.BIGQUERY_PROJECT_ID,
+        CONFIG.BIGQUERY_DATASET_ID,
+        reportConfig.NAME
+      );
+      Logger.log("Truncated table %s.", reportConfig.NAME);
     } else {
-      Logger.log('Table %s already exists.  Will not recreate.',
-          reportConfig.NAME);
+      Logger.log(
+        "Table %s already exists.  Will not recreate.",
+        reportConfig.NAME
+      );
       return;
     }
   }
@@ -183,22 +223,28 @@ function createTable(reportConfig) {
   table.schema = schema;
   table.friendlyName = reportConfig.NAME;
   table.timePartitioning = {
-    "type": 'DAY',
-    "field": 'Date',
-  }
-  table.requirePartitionFilter = true
+    type: "DAY",
+    field: "Date",
+  };
+  table.requirePartitionFilter = true;
   table.clustering = {
-    "fields": ['App_ID', 'Country'] 
-  }
+    fields: ["App_ID", "Country"],
+  };
   table.tableReference = BigQuery.newTableReference();
   table.tableReference.datasetId = CONFIG.BIGQUERY_DATASET_ID;
   table.tableReference.projectId = CONFIG.BIGQUERY_PROJECT_ID;
   table.tableReference.tableId = reportConfig.NAME;
 
-  table = BigQuery.Tables.insert(table, CONFIG.BIGQUERY_PROJECT_ID,
-      CONFIG.BIGQUERY_DATASET_ID);
-
-  Logger.log('Created table with id %s.', table.id);
+  try {
+    table = BigQuery.Tables.insert(
+      table,
+      CONFIG.BIGQUERY_PROJECT_ID,
+      CONFIG.BIGQUERY_DATASET_ID
+    );
+    Logger.log("Created table with id %s.", table.id);
+  } catch (e) {
+    Logger.log(e);
+  }
 }
 
 /**
@@ -210,8 +256,10 @@ function createTable(reportConfig) {
  */
 function tableExists(tableId) {
   // Get a list of all tables in the dataset.
-  var tables = BigQuery.Tables.list(CONFIG.BIGQUERY_PROJECT_ID,
-      CONFIG.BIGQUERY_DATASET_ID);
+  var tables = BigQuery.Tables.list(
+    CONFIG.BIGQUERY_PROJECT_ID,
+    CONFIG.BIGQUERY_DATASET_ID
+  );
   var tableExists = false;
   // Iterate through each table and check for an id match.
   if (tables.tables != null) {
@@ -230,48 +278,63 @@ function tableExists(tableId) {
  * Checks if data already exists for the given date
  */
 function checkIfRowsExist(reportConfig) {
-	let dateToCheck = yesterdayFormatted
-	if (backfill) {
-		dateToCheck = backfill_start_date
-	}
-	
-	// Build the BigQuery SQL query.
-	const request = {
-		query: "SELECT * " +
-					"FROM `" + CONFIG.BIGQUERY_PROJECT_ID + "." + CONFIG.BIGQUERY_DATASET_ID + "." + reportConfig.NAME + "` " +
-					"WHERE Date = '" + dateToCheck + "' " +
-					"LIMIT 10",
-		useLegacySql: false
-	};
-	
-	try {
-		// Run the query and get the results.
-		let queryResults = BigQuery.Jobs.query(request, CONFIG.BIGQUERY_PROJECT_ID);
-		const jobId = queryResults.jobReference.jobId;
+  let dateToCheck = yesterdayFormatted;
+  if (backfill) {
+    dateToCheck = backfill_end_date;
+  }
 
-		// Check on status of the Query Job.
-		let sleepTimeMs = 500;
-		while (!queryResults.jobComplete) {
-			Utilities.sleep(sleepTimeMs);
-			sleepTimeMs *= 2;
-			queryResults = BigQuery.Jobs.getQueryResults(CONFIG.BIGQUERY_PROJECT_ID, jobId);
-		}
-		
-		// Get all the rows of results.
-		let rows = queryResults.rows;
-		
-		if (rows) {
-			Logger.log(reportConfig.NAME + ": There are already rows in this table with the specified date value: " + dateToCheck);
-			return 1;
-		}
-		
-	} catch (error) {
-		// Handle any errors that might occur during the query execution.
-		Logger.log("Error occurred: " + error.message);
-	}
-	
-	// Return 0 if there are no rows with the specified date value.
-	return 0;
+  // Build the BigQuery SQL query.
+  const request = {
+    query:
+      "SELECT * " +
+      "FROM `" +
+      CONFIG.BIGQUERY_PROJECT_ID +
+      "." +
+      CONFIG.BIGQUERY_DATASET_ID +
+      "." +
+      reportConfig.NAME +
+      "` " +
+      "WHERE Date = '" +
+      dateToCheck +
+      "' " +
+      "LIMIT 10",
+    useLegacySql: false,
+  };
+
+  try {
+    // Run the query and get the results.
+    let queryResults = BigQuery.Jobs.query(request, CONFIG.BIGQUERY_PROJECT_ID);
+    const jobId = queryResults.jobReference.jobId;
+
+    // Check on status of the Query Job.
+    let sleepTimeMs = 500;
+    while (!queryResults.jobComplete) {
+      Utilities.sleep(sleepTimeMs);
+      sleepTimeMs *= 2;
+      queryResults = BigQuery.Jobs.getQueryResults(
+        CONFIG.BIGQUERY_PROJECT_ID,
+        jobId
+      );
+    }
+
+    // Get all the rows of results.
+    let rows = queryResults.rows;
+
+    if (rows) {
+      Logger.log(
+        reportConfig.NAME +
+          ": There are already rows in this table with the specified date value: " +
+          dateToCheck
+      );
+      return 1;
+    }
+  } catch (error) {
+    // Handle any errors that might occur during the query execution.
+    Logger.log("Error occurred: " + error.message);
+  }
+
+  // Return 0 if there are no rows with the specified date value.
+  return 0;
 }
 
 /**
@@ -282,29 +345,111 @@ function checkIfRowsExist(reportConfig) {
  *
  * @return {Array.<string>} jobIds The list of all job ids.
  */
-function processReports() {
+function processReports(configReports) {
   var jobIds = [];
+  var account = AdsApp.currentAccount();
+  var accountId = account.getCustomerId();
+  reportsConfig = JSON.parse(configReports)[accountId];
 
   // Iterate over each report type.
-  for (var i = 0; i < CONFIG.REPORTS.length; i++) {
-    var reportConfig = CONFIG.REPORTS[i];
+  for (var i = 0; i < reportsConfig.length; i++) {
+    var reportConfig = reportsConfig[i];
     if (checkIfRowsExist(reportConfig)) {
-			continue
-		}
-    Logger.log('Running report %s', reportConfig.NAME);
-    // Change child account to the one for which we are running the report 
-    AdsManagerApp.select(ACCOUNTS_LIST[i]);
+      continue;
+    }
+    Logger.log("Running report %s", reportConfig.NAME);
+
+    var query = getQuery(reportConfig.NAME);
+
+    var apiFieldNames = getAPIFieldNames(reportConfig.NAME);
+
     // Get data as an array of CSV chunks.
-    var csvData = retrieveAdsReport(reportConfig);
+    var csvData = retrieveAdsReport(reportConfig, query, apiFieldNames);
     for (var j = 0; j < csvData.length; j++) {
       // Convert to Blob format.
-      var blobData = Utilities.newBlob(csvData[j], 'application/octet-stream');
+      var blobData = Utilities.newBlob(csvData[j], "application/octet-stream");
       // Load data
       var jobId = loadDataToBigquery(reportConfig, blobData, !j ? 1 : 0);
       jobIds.push(jobId);
     }
   }
-  return jobIds;
+  return JSON.stringify(jobIds);
+}
+
+function getQuery(reportName) {
+  if (backfill == true) {
+    var dateFilter =
+      "segments.date >= '" +
+      backfill_start_date +
+      "' AND segments.date <= '" +
+      backfill_end_date;
+  } else {
+    var dateFilter = "segments.date = '" + yesterdayFormatted;
+  }
+
+  if (reportName.startsWith("google_ads_cost_report_") == true) {
+    var query =
+      "SELECT " +
+      "metrics.cost_micros, " +
+      "geographic_view.country_criterion_id, " +
+      "campaign.app_campaign_setting.app_id, " +
+      "customer.currency_code, " +
+      "segments.date, " +
+      "campaign.app_campaign_setting.app_store " +
+      "FROM " +
+      "geographic_view " +
+      "WHERE " +
+      dateFilter +
+      "' " +
+      "AND metrics.cost_micros > 0 " +
+      "AND campaign.app_campaign_setting.app_id is not null " +
+      "AND campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
+  } else if (reportName.startsWith("google_ads_install_report_") == true) {
+    var query =
+      "SELECT " +
+      "metrics.conversions, " +
+      "geographic_view.country_criterion_id, " +
+      "campaign.app_campaign_setting.app_id, " +
+      "segments.date, " +
+      "campaign.app_campaign_setting.app_store, " +
+      "campaign.advertising_channel_sub_type, " +
+      "segments.conversion_action_category " +
+      "FROM " +
+      "geographic_view " +
+      "WHERE " +
+      dateFilter +
+      "' " +
+      "AND metrics.conversions > 0 " +
+      "AND campaign.app_campaign_setting.app_id is not null " +
+      "AND campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE' " +
+      "AND campaign.advertising_channel_sub_type = 'APP_CAMPAIGN' " +
+      "AND segments.conversion_action_category = 'DOWNLOAD'";
+  }
+  return query;
+}
+
+function getAPIFieldNames(reportName) {
+  if (reportName.startsWith("google_ads_cost_report_") == true) {
+    var apiFieldNames = [
+      "metrics.costMicros",
+      "geographicView.countryCriterionId",
+      "campaign.appCampaignSetting.appId",
+      "customer.currencyCode",
+      "segments.date",
+      "campaign.appCampaignSetting.appStore",
+    ];
+  } else if (reportName.startsWith("google_ads_install_report_") == true) {
+    var apiFieldNames = [
+      "metrics.conversions",
+      "geographicView.countryCriterionId",
+      "campaign.appCampaignSetting.appId",
+      "segments.date",
+      "campaign.appCampaignSetting.appStore",
+      "campaign.advertisingChannelSubType",
+      "segments.conversionActionCategory",
+    ];
+  }
+  return apiFieldNames;
 }
 
 /**
@@ -313,116 +458,104 @@ function processReports() {
  *
  * @param {Object} reportConfig Report configuration including report name,
  *    conditions, and fields.
+ * @param {string} query The GAQL query to run for the report.
+ * @param {Array.<string>} apiFieldNames The list of field names expected to return in the query response.
  *
  * @return {!Array.<string>} a chunked report in csv format.
  */
-function retrieveAdsReport(reportConfig) {
+function retrieveAdsReport(reportConfig, query, apiFieldNames) {
   var fieldNames = Object.keys(reportConfig.FIELDS);
-  if (backfill == true) {
-    var query = "SELECT " +
-    "metrics.conversions, " +
-    "metrics.cost_micros, " +
-    "geographic_view.country_criterion_id, " +
-    "campaign.app_campaign_setting.app_id, " +
-    "customer.currency_code, " +
-    "segments.date, " +
-    "campaign.app_campaign_setting.app_store " +
-    "FROM " +
-    "geographic_view " +
-    "WHERE " +
-    "segments.date >= '" + backfill_start_date + "' AND segments.date <= '" + backfill_end_date + "' " +
-    "AND metrics.cost_micros > 0 " +
-    "and campaign.app_campaign_setting.app_id is not null " +
-    "and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
-  }
-  else {
-    var query = "SELECT " +
-    "metrics.conversions, " +
-    "metrics.cost_micros, " +
-    "geographic_view.country_criterion_id, " +
-    "campaign.app_campaign_setting.app_id, " +
-    "customer.currency_code, " +
-    "segments.date, " +
-    "campaign.app_campaign_setting.app_store " +
-    "FROM " +
-    "geographic_view " +
-    "WHERE " +
-    "segments.date = '" + yesterdayFormatted + "' " +
-    "AND metrics.cost_micros > 0 " +
-    "and campaign.app_campaign_setting.app_id is not null " +
-    "and campaign.app_campaign_setting.app_store = 'GOOGLE_APP_STORE'";
-  }
-  Logger.log(query);
-  
-  var report = AdsApp.report(
-    query);
-  var rows = report.rows();
+
+  var report = AdsApp.search(query);
   var chunks = [];
   var chunkLen = 0;
   var csvRows = [];
   var totalRows = 0;
   // Header row
-  var header = fieldNames.join(',');
+  var header = fieldNames.join(",");
   csvRows.push(header);
   chunkLen += Utilities.newBlob(header).getBytes().length + 1;
 
   // Iterate over each row.
-  while (rows.hasNext()) {
-    var row = rows.next();
+  while (report.hasNext()) {
+    var row = report.next();
     if (chunkLen > MAX_INSERT_SIZE) {
-      chunks.push(csvRows.join('\n'));
+      chunks.push(csvRows.join("\n"));
       totalRows += csvRows.length;
       chunkLen = 0;
       csvRows = [];
     }
     var csvRow = [];
-    var fieldNames2 = [
-      'metrics.conversions', 
-      'metrics.cost_micros', 
-      'geographic_view.country_criterion_id', 
-      'campaign.app_campaign_setting.app_id', 
-      'customer.currency_code', 
-      'segments.date', 
-      'campaign.app_campaign_setting.app_store'
-    ]
+    var fieldNames2 = apiFieldNames;
     for (var i = 0; i < fieldNames2.length; i++) {
       var fieldName = fieldNames[i];
       var fieldName2 = fieldNames2[i];
-      if (fieldName2 == 'campaign.app_campaign_setting.app_store') {
-        continue
+      if (
+        fieldName2 == "campaign.appCampaignSetting.appStore" ||
+        fieldName2 == "campaign.advertisingChannelSubType" ||
+        fieldName2 == "segments.conversionActionCategory"
+      ) {
+        continue;
       }
-      // for debugging purposes
-      if (row[fieldName2] == undefined) {
-        Logger.log(fieldName2)
-        Logger.log(row)
-      }
-      var fieldValue = row[fieldName2].toString();
+      var fieldValue = returnDynamicField(row, fieldName2).toString();
       var fieldType = reportConfig.FIELDS[fieldName];
       // Strip off % and perform any other formatting here.
-      if (fieldType == 'FLOAT' || fieldType == 'INTEGER') {
-        if (fieldValue.charAt(fieldValue.length - 1) == '%') {
+      if (fieldType == "FLOAT" || fieldType == "INTEGER") {
+        if (fieldValue.charAt(fieldValue.length - 1) == "%") {
           fieldValue = fieldValue.substring(0, fieldValue.length - 1);
         }
-        fieldValue = fieldValue.replace(/,/g,'');
+        fieldValue = fieldValue.replace(/,/g, "");
       }
       // Add double quotes to any string values.
-      if (fieldType == 'STRING') {
+      if (fieldType == "STRING") {
         fieldValue = fieldValue.replace(/"/g, '""');
         fieldValue = '"' + fieldValue + '"';
       }
       csvRow.push(fieldValue);
     }
-    var rowString = csvRow.join(',');
-    csvRows.push(rowString);
+    var rowString = csvRow.join(",");
+    if (rowString != "") {
+      csvRows.push(rowString);
+    }
     chunkLen += Utilities.newBlob(rowString).getBytes().length + 1;
   }
   if (csvRows) {
     totalRows += csvRows.length;
-    chunks.push(csvRows.join('\n'));
+    chunks.push(csvRows.join("\n"));
   }
-  Logger.log('Downloaded ' + reportConfig.NAME + ' with ' + totalRows +
-      ' rows, in ' + chunks.length + ' chunks.');
+  Logger.log(
+    "Downloaded " +
+      reportConfig.NAME +
+      " with " +
+      totalRows +
+      " rows, in " +
+      chunks.length +
+      " chunks."
+  );
   return chunks;
+}
+
+function returnDynamicField(row, fieldName) {
+  // Split the fieldName by '.' to handle nested properties
+  var fields = fieldName.split(".");
+
+  // Start with the row as the initial object
+  var value = row;
+
+  // Iterate over the fields to access the nested property
+  for (var i = 0; i < fields.length; i++) {
+    if (value[fields[i]] !== undefined) {
+      // Update the value as we go deeper
+      value = value[fields[i]];
+    } else {
+      // Handle the case where the property does not exist
+      Logger.log("Property not found: " + fields[i]);
+      return null; // Exit if any property in the chain is undefined
+    }
+  }
+
+  // Log the final value
+  return value;
 }
 
 /**
@@ -443,45 +576,57 @@ function loadDataToBigquery(reportConfig, data, skipLeadingRows) {
         destinationTable: {
           projectId: CONFIG.BIGQUERY_PROJECT_ID,
           datasetId: CONFIG.BIGQUERY_DATASET_ID,
-          tableId: reportConfig.NAME
+          tableId: reportConfig.NAME,
         },
         skipLeadingRows: skipLeadingRows ? skipLeadingRows : 0,
-        nullMarker: '--'
-      }
-    }
+        nullMarker: "--",
+      },
+    },
   };
 
   var insertJob = BigQuery.Jobs.insert(job, CONFIG.BIGQUERY_PROJECT_ID, data);
-  Logger.log('Load job started for %s. Check on the status of it here: ' +
-      'https://bigquery.cloud.google.com/jobs/%s', reportConfig.NAME,
-       CONFIG.BIGQUERY_PROJECT_ID);
+  Logger.log(
+    "Load job started for %s. Check on the status of it here: " +
+      "https://bigquery.cloud.google.com/jobs/%s",
+    reportConfig.NAME,
+    CONFIG.BIGQUERY_PROJECT_ID
+  );
   return insertJob.jobReference.jobId;
 }
 
 /**
  * Polls until all jobs are 'DONE'.
  *
- * @param {Array.<string>} jobIds The list of all job ids.
+ * @param {Array.<string>} results The return value from the callback function containing jobIds of all job ids.
  */
-function waitTillJobsComplete(jobIds) {
+function waitTillJobsComplete(results) {
   var complete = false;
-  var remainingJobs = jobIds;
+  totalJobIds = [];
+  for (var i = 0; i < results.length; i++) {
+    jobIds = JSON.parse(results[i].getReturnValue());
+    totalJobIds = totalJobIds.concat(jobIds);
+  }
+
+  var remainingJobs = totalJobIds;
   while (!complete) {
-    if (AdsApp.getExecutionInfo().getRemainingTime() < 5){
-      Logger.log('Script is about to timeout, jobs ' + remainingJobs.join(',') +
-        ' are still incomplete.');
+    if (AdsApp.getExecutionInfo().getRemainingTime() < 5) {
+      Logger.log(
+        "Script is about to timeout, jobs " +
+          remainingJobs.join(",") +
+          " are still incomplete."
+      );
     }
     remainingJobs = getIncompleteJobs(remainingJobs);
     if (remainingJobs.length == 0) {
       complete = true;
     }
     if (!complete) {
-      Logger.log(remainingJobs.length + ' jobs still being processed.');
+      Logger.log(remainingJobs.length + " jobs still being processed.");
       // Wait 5 seconds before checking status again.
       Utilities.sleep(5000);
     }
   }
-  Logger.log('All jobs processed.');
+  Logger.log("All jobs processed.");
 }
 
 /**
@@ -497,7 +642,7 @@ function getIncompleteJobs(jobIds) {
   for (var i = 0; i < jobIds.length; i++) {
     var jobId = jobIds[i];
     var getJob = BigQuery.Jobs.get(CONFIG.BIGQUERY_PROJECT_ID, jobId);
-    if (getJob.status.state != 'DONE') {
+    if (getJob.status.state != "DONE") {
       remainingJobIds.push(jobId);
     }
   }

@@ -50,7 +50,7 @@ function deploy_cloud_function() {
   echo "Creating scheduler job analytics_data_scheduler and PubSub topic analytics_data"
   gcloud scheduler jobs create pubsub \
     "analytics_data_scheduler" \
-    --schedule "30 1 * * *" \
+    --schedule "30 2 * * *" \
     --topic analytics_data \
     --location us-central1 \
     --time-zone="Europe/London" \
@@ -68,11 +68,11 @@ function deploy_cloud_function() {
     --set-env-vars GCP_PROJECT=${PROJECT} \
     --entry-point main \
     --source . \
-    --memory 2048MB \
+    --memory 3072MB \
     --timeout 540s \
     --trigger-topic analytics_data \
     --project ${PROJECT} \
-    --service-account analytics-data@${PROJECT}.iam.gserviceaccount.com
+    --service-account ${PROJECT}@appspot.gserviceaccount.com
 }
 
 function deploy_all() {

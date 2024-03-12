@@ -6,4 +6,3 @@ mappings:
   hm games:
     bucket: pubsite_prod_abcd
     table_suffix: ABCD
-

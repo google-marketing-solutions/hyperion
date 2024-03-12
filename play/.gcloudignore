@@ -12,4 +12,5 @@
 __pycache__
 README.md
 backfill.sh
+backfill_auto.sh
 deploy.sh
