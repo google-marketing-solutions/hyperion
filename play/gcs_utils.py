@@ -78,11 +78,16 @@ def get_blobs_data_frame_with_date_range(
             dtypes = {}
         if report_type == "Earnings":
             dtypes = {
-                "Buyer Postal Code": str,
-                "Product Type": str,
-                "Service Fee %": str,
-                "Promotion ID": str,
+                "Transaction Date": str,
+                "Product id": str,
+                "Buyer Country": str,
             }
+            selected_columns = [
+                "Transaction Date",
+                "Product id",
+                "Buyer Country",
+                "Amount (Merchant Currency)",
+            ]
             with blob.open(mode="rb") as zip_blob:
                 zip_in_memory = BytesIO(zip_blob.read())
             with ZipFile(zip_in_memory, "r") as zip_ref:
@@ -93,6 +98,7 @@ def get_blobs_data_frame_with_date_range(
                         parse_dates=date_fields,
                         dtype=dtypes,
                         keep_default_na=False,
+                        usecols=selected_columns,
                     )
             del zip_in_memory
         else:

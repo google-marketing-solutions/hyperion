@@ -40,23 +40,48 @@ function enable_apis() {
 }
 
 function deploy_cloud_function() {
-  echo "Creating scheduler job play_feeds_scheduler"
-  gcloud scheduler jobs create pubsub \
-    "play_feeds_scheduler" \
-    --schedule "0 6 * * *" \
-    --topic "${TOPIC}" \
-    --attributes dry_run="${TEST}",report_requested="installs" \
-    --location us-central1 \
-    --project ${PROJECT}
+  # Define job configurations in an array
+  jobs=(
+      'play_feeds_scheduler::0 6 * * *'
+      'play_feeds_earnings_scheduler::0 0 6 * *'
+  )
 
-  echo "Creating scheduler job play_feeds_earnings_scheduler"
-  gcloud scheduler jobs create pubsub \
-    "play_feeds_earnings_scheduler" \
-    --schedule "0 0 6 * *" \
-    --topic "${TOPIC}" \
-    --attributes dry_run="${TEST}",report_requested="earnings" \
-    --location us-central1 \
-    --project ${PROJECT}
+  # Loop through the jobs array
+  for index in "${jobs[@]}"; do
+      job_name="${index%%::*}"
+      schedule="${index##*::}"
+      attributes="dry_run=${TEST}"
+
+      # Depending on the job, set specific attributes
+      if [[ "$job_name" == "play_feeds_scheduler" ]]; then
+          attributes="${attributes},report_requested=installs"
+      elif [[ "$job_name" == "play_feeds_earnings_scheduler" ]]; then
+          attributes="${attributes},report_requested=earnings"
+      fi
+
+      # Check if the job exists
+      if gcloud scheduler jobs describe ${job_name} --location us-central1 --project ${PROJECT} 2>/dev/null; then
+          echo "Job ${job_name} exists, updating..."
+          # Update the job
+          gcloud scheduler jobs update pubsub \
+              "${job_name}" \
+              --schedule "${schedule}" \
+              --topic "${TOPIC}" \
+              --update-attributes "${attributes}" \
+              --location us-central1 \
+              --project ${PROJECT}
+      else
+          echo "Job ${job_name} does not exist, creating..."
+          # Create the job
+          gcloud scheduler jobs create pubsub \
+              "${job_name}" \
+              --schedule "${schedule}" \
+              --topic "${TOPIC}" \
+              --attributes "${attributes}" \
+              --location us-central1 \
+              --project ${PROJECT}
+      fi
+  done
 
   echo "Creating PubSub topic ${TOPIC}"
   gcloud pubsub topics create ${TOPIC}
@@ -65,24 +90,30 @@ function deploy_cloud_function() {
   gcloud pubsub topics create ${TOPIC}_backfill
 
   echo "Deploying Play Feeds Cloud Function"
-  gcloud functions deploy play_feeds \
+  gcloud functions deploy play_feeds_1 \
+    --gen2 \
+    --project ${PROJECT} \
+    --set-env-vars GCP_PROJECT=${PROJECT} \
     --region us-central1 \
     --runtime python311 \
     --entry-point main \
     --memory 2048MB \
     --timeout=540s \
     --trigger-topic=${TOPIC} \
-    --service-account play-console-buckets@${PROJECT}.iam.gserviceaccount.com
+    --service-account ${PROJECT}@appspot.gserviceaccount.com
 
   echo "Deploying Play Feeds Cloud Function for Backfill"
-  gcloud functions deploy play_feeds_backfill \
+  gcloud functions deploy play_feeds_backfill_1 \
+    --gen2 \
+    --project ${PROJECT} \
+    --set-env-vars GCP_PROJECT=${PROJECT} \
     --region us-central1 \
     --runtime python311 \
     --entry-point backfill \
     --memory 8GB \
     --timeout=540s \
     --trigger-topic=${TOPIC}_backfill \
-    --service-account play-console-buckets@${PROJECT}.iam.gserviceaccount.com
+    --service-account ${PROJECT}@appspot.gserviceaccount.com
 
 }
 

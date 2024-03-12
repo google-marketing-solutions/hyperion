@@ -53,6 +53,7 @@ function deploy_cloud_function() {
 
   echo "Deploying Get AdMob Reports Cloud Function"
   gcloud functions deploy get_admob_reports \
+    --gen2 \
     --region us-central1 \
     --runtime python311 \
     --set-env-vars GCP_PROJECT=${PROJECT} \
@@ -60,6 +61,7 @@ function deploy_cloud_function() {
     --memory 8GB \
     --timeout=540s \
     --trigger-topic get_admob_reports \
+    --project ${PROJECT}
 
   # Assign BigQuery Data Owner role
   gcloud projects add-iam-policy-binding ${PROJECT} \

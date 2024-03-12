@@ -12,5 +12,6 @@
 __pycache__
 README.md
 *.json
+backfill.sh
 deploy.sh
 run.sh

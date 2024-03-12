@@ -23,7 +23,7 @@ import traceback
 from flatten_json import flatten
 from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import admob_utils
 
 TOKEN_NUMBER = 0
@@ -317,7 +317,7 @@ def create_table(client, table_id, reporting_table=False):
     except NotFound:
         schema = get_table_schema(reporting_table)
         table = bigquery.Table(table_id, schema=schema)
-        table = client.create_table(table)
+        table = client.create_table(table, exists_ok=True)
         custom_logging(f"Table {table_id} created.")
         if reporting_table:
             configure_reporting_table(table, table_id)
@@ -408,7 +408,7 @@ def load_data_to_bigquery(client, data, table_id):
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
     )
 
-    for i in range(5):  # max retries for load job
+    for i in range(2):  # max retries for load job
         try:
             job = client.load_table_from_json(data, table_id, job_config=job_config)
             custom_logging(f"Job ID: {job.job_id}")
@@ -417,7 +417,7 @@ def load_data_to_bigquery(client, data, table_id):
         except Exception as e:
             custom_logging(f"Error on attempt {i+1}:")
             exception_logging(e)
-            time.sleep(10 * (2**i))  # retry delay = 10
+            time.sleep(5 * (2**i))  # retry delay = 10
 
 
 def log_bigquery_table_info(client, table_id):
@@ -485,6 +485,10 @@ def generate_mediation_report(
     else:
         _, data = execute_mediation_report_request(service, publisher_id, report_spec)
 
+    # End the processing of this token if no data is retrieved
+    if not data:
+        return
+
     data = flatten_and_format_data(data)
 
     if dry_run:
@@ -521,19 +525,7 @@ def create_latest_date_to_run():
     """
     tz = pytz.timezone("America/Los_Angeles")
     datetime_now = datetime.now(tz)
-    cloud_scheduler_time = datetime(
-        year=datetime_now.year,
-        month=datetime_now.month,
-        day=datetime_now.day,
-        hour=2,
-        minute=0,
-        tzinfo=tz,
-    )
-
-    if datetime_now < cloud_scheduler_time:
-        latest_date_to_run = datetime_now.date() - timedelta(days=2)
-    else:
-        latest_date_to_run = datetime_now.date() - timedelta(days=1)
+    latest_date_to_run = datetime_now.date() - timedelta(days=1)
 
     return latest_date_to_run
 
