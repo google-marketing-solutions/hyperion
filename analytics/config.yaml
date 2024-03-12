@@ -22,21 +22,32 @@ table:
         type: FLOAT
       - name: dauPerWau
         type: FLOAT
-      # - name: wauPerMau
-      #   type: FLOAT
-      - name: totalAdRevenue
-        type: FLOAT
-      - name: purchaseRevenue
+      - name: wauPerMau
         type: FLOAT
       - name: averagePurchaseRevenuePerPayingUser
         type: FLOAT
       - name: averageRevenuePerUser
         type: FLOAT
-      - name: averageSessionDuration
+      - name: sessionsPerUser
         type: FLOAT
+      - name: userEngagementDuration
+        type: INTEGER
+    metrics_cohort:
+      - name: day01ActiveUsers
+        type: INTEGER
+      - name: day01TotalUsers
+        type: INTEGER
+      - name: day07ActiveUsers
+        type: INTEGER
+      - name: day07TotalUsers
+        type: INTEGER
+      - name: day30ActiveUsers
+        type: INTEGER
+      - name: day30TotalUsers
+        type: INTEGER
   partition_field: date
   clustering_fields:
     - appId
     - countryId
-local_dir_name: responses
-local_file_name_prefix: data_from_response_
+  local_dir_name: responses
+  local_file_name_prefix: data_from_response_

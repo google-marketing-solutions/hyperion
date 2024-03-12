@@ -6,4 +6,4 @@
 */*.json
 */__pycache__
 .vscode
-*/responses_*
+*/responses/

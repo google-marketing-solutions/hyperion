@@ -44,6 +44,7 @@ REPORT_TYPES = {"Installs": ["country"], "Earnings": [""]}
 #   'Crashes': ['app_version', 'device', 'os_version', 'overview'],
 #   'Installs': ['app_version', 'carrier', 'country', 'device', 'language',
 #                'os_version', 'overview'],
+#   'Earnings': [''],
 #   'Ratings': ['app_version', 'carrier', 'country', 'device', 'language', 'os_version', 'overview'],
 #   'Reviews': [''],
 #   'Store_Performance': ['country', 'traffic_source'],
@@ -112,9 +113,17 @@ def transfer_play_reports(
                     report_type, start_date, end_date
                 )
             )
-            dimension_blobs = gcs_utils.find_files_from_cloud_storage_with_date_range(
-                bucket, prefix, dimensions, start_date, end_date
-            )
+            try:
+                dimension_blobs = (
+                    gcs_utils.find_files_from_cloud_storage_with_date_range(
+                        bucket, prefix, dimensions, start_date, end_date
+                    )
+                )
+            except Exception as e:
+                logger.log(
+                    f"Error processing report type {report_requested} for bucket {bucket}: {e}"
+                )
+                continue
 
             write_cloud_storage_to_bigquery(
                 report_type,
@@ -276,7 +285,6 @@ def write_cloud_storage_to_bigquery(
                 df["Android_OS_Version"] = df["Android_OS_Version"].astype(str)
             elif report_type == "Earnings":
                 df = df.convert_dtypes()
-                df["Hardware"] = df["Hardware"].astype(str)
 
             logger.log("Writing to bigquery table: {}".format(table_id))
             job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
@@ -290,7 +298,7 @@ def run(
     dry_run: bool = False,
     start_date: str | None = None,
     end_date: str | None = None,
-    report_requested: str | None = None,
+    report_requested: str = "installs",
 ):
     """Reads config file and run the function.
 
@@ -306,12 +314,55 @@ def run(
     # (2) (20220801, None), then run backfill for period: 20220801 ~ D-4;
     # (3) (None, 20220801), then run for one day: 20220801 ~ 20220801;
     # (4) (20220801, 20220930), then run backfill for period: 20220801 ~ 20220930.
+
+    def calculate_end_date(today: date, report_requested: str) -> datetime:
+        """Calculates the end date for the report based on the report type.
+
+        Args:
+            today: The current date.
+            report_requested: The type of report requested.
+
+        Returns:
+            The calculated end date.
+        """
+        if report_requested.lower() == "earnings":
+            return datetime(today.year, today.month, 1) - timedelta(days=1)
+        else:
+            return datetime(today.year, today.month, today.day) - timedelta(days=4)
+
+    def calculate_start_date(
+        end_date: datetime, today: date, report_requested: str
+    ) -> datetime:
+        """Calculates the start date for the report based on the report type.
+
+        Args:
+            end_date: The calculated end date.
+            today: The current date.
+            report_requested: The type of report requested.
+
+        Returns:
+            The calculated start date.
+        """
+        if report_requested.lower() == "earnings":
+            last_day_previous_month = datetime(today.year, today.month, 1) - timedelta(
+                days=1
+            )
+            return datetime(
+                last_day_previous_month.year, last_day_previous_month.month, 1
+            )
+        else:
+            return end_date
+
+    today = date.today()
     if end_date:
         end_date = datetime.strptime(end_date, "%Y%m%d")
     else:
-        today = date.today()
-        end_date = datetime(today.year, today.month, today.day) - timedelta(days=4)
-    start_date = datetime.strptime(start_date, "%Y%m%d") if start_date else end_date
+        end_date = calculate_end_date(today, report_requested)
+
+    if start_date:
+        start_date = datetime.strptime(start_date, "%Y%m%d")
+    else:
+        start_date = calculate_start_date(end_date, today, report_requested)
 
     if dry_run:
         config_yaml_file = "config_test.yaml"
@@ -357,12 +408,15 @@ def main(event: Mapping[str, Mapping], context: Mapping):
     """
     pubsub_attributes = event["attributes"]
     dry_run = pubsub_attributes.get("dry_run")
+    report_requested = pubsub_attributes.get("report_requested")
     if dry_run == "dry_run":
         logger.log("Running test...")
-        run(dry_run=True)
+        run(dry_run=True, report_requested=report_requested)
     else:
         logger.log("This is NOT a dry run...")
-        run()
+        run(report_requested=report_requested)
+
+    logger.log("Done with the usual run")
 
 
 def backfill(event: Mapping[str, Mapping], context: Mapping):
@@ -384,3 +438,17 @@ def backfill(event: Mapping[str, Mapping], context: Mapping):
     else:
         logger.log("Running backfill...")
         run(start_date=start_date, end_date=end_date, report_requested=report_requested)
+
+    logger.log("Done with the backfill")
+
+
+if __name__ == "__main__":
+    event = Mapping(
+        {
+            "dry_run": "dry_run",
+            "start_date": "20240205",
+            "end_date": "20240223",
+            "report_requested": "Installs",
+        }
+    )
+    backfill(event)
