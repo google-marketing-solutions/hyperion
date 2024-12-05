@@ -43,7 +43,7 @@ function deploy_cloud_function() {
   # Define job configurations in an array
   jobs=(
       'play_feeds_scheduler::0 6 * * *'
-      'play_feeds_earnings_scheduler::0 0 6 * *'
+      'play_feeds_earnings_scheduler::0 0 6-10 * *'
   )
 
   # Loop through the jobs array
