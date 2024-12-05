@@ -310,8 +310,8 @@ def run(
     """
     # There are 4 scenarios, backfill or running for a day / the most recent day:
     # If (start_date, end_date) is:
-    # (1) (None, None), then run for most recent day D-4 ~ D-4;
-    # (2) (20220801, None), then run backfill for period: 20220801 ~ D-4;
+    # (1) (None, None), then run for most recent day D-6 ~ D-6;
+    # (2) (20220801, None), then run backfill for period: 20220801 ~ D-6;
     # (3) (None, 20220801), then run for one day: 20220801 ~ 20220801;
     # (4) (20220801, 20220930), then run backfill for period: 20220801 ~ 20220930.
 
@@ -328,7 +328,7 @@ def run(
         if report_requested.lower() == "earnings":
             return datetime(today.year, today.month, 1) - timedelta(days=1)
         else:
-            return datetime(today.year, today.month, today.day) - timedelta(days=4)
+            return datetime(today.year, today.month, today.day) - timedelta(days=6)
 
     def calculate_start_date(
         end_date: datetime, today: date, report_requested: str
