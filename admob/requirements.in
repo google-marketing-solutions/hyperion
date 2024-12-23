@@ -1,6 +1,7 @@
-functions-framework
 google-api-python-client
 google-auth-oauthlib
 google-cloud-bigquery
 flatten-json
 pytz
+google-cloud-functions
+functions-framework==3.*
