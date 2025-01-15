@@ -2,6 +2,10 @@
 
 <br>
 
+**Disclaimer: This is not an official Google solution**
+
+<br>
+
 **CHECK OUT THE DEMO DASHBOARD HERE: [\[Demo\] Hyperion: BI Dashboard](https://lookerstudio.google.com/reporting/168815b0-75d0-4c63-9872-621decc90be6)**
 
 - **[Join this Google Group for instant access](https://groups.google.com/a/professional-services.goog/g/solutions_hyperion-readers)**
@@ -90,7 +94,7 @@
 
       1) Make a copy of the template for the BI Dashboard Accounts List [here](https://docs.google.com/spreadsheets/d/1xCeu81C9Unx50Re0bbj6zLD3qphuHwf2kBk246OZUBs/edit?usp=sharing), and fill it up with the company's accounts. This sheet will help to keep track of all accounts to be linked in the BI Dashboard.
       2) Create a new Google Cloud Platform (GCP) project with billing enabled and obtain owner access to that project.
-      3) When done with the Accounts List sheet, join the Google Group [solutions_hyperion-readers](https://groups.google.com/a/google.com/g/solutions_hyperion-readers). This will allow you to access all the solution assets, including the dashboard template.
+      3) When done with the Accounts List sheet, join the Google Group [solutions_hyperion-readers](https://groups.google.com/a/professional-services.goog/g/solutions_hyperion-readers). This will allow you to access all the solution assets, including the dashboard template.
 
 
    2) ## AdMob setup
